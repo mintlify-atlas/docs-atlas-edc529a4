@@ -1,0 +1,130 @@
+---
+title: all_commits
+description: Get all Git commits in a DVC repository
+---
+
+## Description
+
+`dvc.api.all_commits()` returns a list of all Git commit SHAs in a DVC repository. This allows you to iterate over the entire commit history to track how data, models, and metrics have evolved.
+
+## Signature
+
+```python
+def all_commits(repo: Optional[str] = None) -> list[str]
+```
+
+## Parameters
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository. Defaults to the current project (found by walking up from the current working directory tree).
+  
+  Can be:
+  - Local file system path
+  - URL (HTTP/HTTPS)
+  - Git SSH URL (e.g., `user@server:project.git`)
+</ParamField>
+
+## Returns
+
+<ResponseField name="commits" type="list[str]">
+  List of Git commit SHAs in the repository
+</ResponseField>
+
+## Examples
+
+### List commits in current repository
+
+```python
+import dvc.api
+
+commits = dvc.api.all_commits()
+print(f"Found {len(commits)} commits")
+print(f"Latest commit: {commits[0][:7]}")
+```
+
+### Track metric evolution over time
+
+```python
+import dvc.api
+import pandas as pd
+
+commits = dvc.api.all_commits()
+
+results = []
+for commit in commits[:10]:  # Last 10 commits
+    try:
+        metrics = dvc.api.metrics_show(rev=commit)
+        results.append({
+            'commit': commit[:7],
+            'accuracy': metrics.get('metrics.json', {}).get('accuracy')
+        })
+    except Exception:
+        continue
+
+df = pd.DataFrame(results)
+print(df)
+```
+
+### Compare data across commit history
+
+```python
+import dvc.api
+
+repo_url = "https://github.com/example/ml-project"
+commits = dvc.api.all_commits(repo=repo_url)
+
+# Check last 5 commits
+for commit in commits[:5]:
+    print(f"\nCommit: {commit[:7]}")
+    
+    try:
+        params = dvc.api.params_show(repo=repo_url, rev=commit)
+        print(f"  Learning rate: {params.get('train', {}).get('lr')}")
+    except Exception as e:
+        print(f"  Error: {e}")
+```
+
+### Build commit history report
+
+```python
+import dvc.api
+from datetime import datetime
+
+commits = dvc.api.all_commits()
+
+print(f"Repository has {len(commits)} commits")
+print(f"\nRecent commits:")
+
+for commit in commits[:20]:
+    try:
+        metrics = dvc.api.metrics_show(rev=commit)
+        if 'metrics.json' in metrics:
+            acc = metrics['metrics.json'].get('accuracy', 'N/A')
+            print(f"  {commit[:7]}: accuracy={acc}")
+    except Exception:
+        pass
+```
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Historical analysis" icon="clock-rotate-left">
+    Analyze how metrics and data evolved over the project history
+  </Card>
+  <Card title="Performance tracking" icon="chart-line">
+    Track model performance improvements across commits
+  </Card>
+  <Card title="Data lineage" icon="diagram-project">
+    Trace data provenance through commit history
+  </Card>
+  <Card title="Audit and compliance" icon="shield-check">
+    Maintain audit trail of all changes to data and models
+  </Card>
+</CardGroup>
+
+## Related functions
+
+- [`all_branches()`](/api/all_branches) - List all branches in a repository
+- [`all_tags()`](/api/all_tags) - List all Git tags in a repository
+- [`params_show()`](/api/params_show) - Get parameters for a specific commit
+- [`metrics_show()`](/api/metrics_show) - Get metrics for a specific commit

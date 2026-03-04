@@ -161,6 +161,14 @@
             ]
           },
           {
+            "group": "SCM",
+            "pages": [
+              "api/all_branches",
+              "api/all_commits",
+              "api/all_tags"
+            ]
+          },
+          {
             "group": "Filesystem",
             "pages": [
               "api/dvcfilesystem"

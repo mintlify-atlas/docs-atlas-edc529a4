@@ -1,0 +1,113 @@
+---
+title: all_branches
+description: Get all Git branches in a DVC repository
+---
+
+## Description
+
+`dvc.api.all_branches()` returns a list of all Git branches in a DVC repository. This is useful for iterating over branches to compare data, metrics, or parameters across different branches.
+
+## Signature
+
+```python
+def all_branches(repo: Optional[str] = None) -> list[str]
+```
+
+## Parameters
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository. Defaults to the current project (found by walking up from the current working directory tree).
+  
+  Can be:
+  - Local file system path
+  - URL (HTTP/HTTPS)
+  - Git SSH URL (e.g., `user@server:project.git`)
+</ParamField>
+
+## Returns
+
+<ResponseField name="branches" type="list[str]">
+  List of Git branch names in the repository
+</ResponseField>
+
+## Examples
+
+### List branches in current repository
+
+```python
+import dvc.api
+
+branches = dvc.api.all_branches()
+print(f"Found {len(branches)} branches: {branches}")
+```
+
+### List branches in remote repository
+
+```python
+import dvc.api
+
+branches = dvc.api.all_branches(
+    repo="https://github.com/example/dvc-project"
+)
+
+for branch in branches:
+    print(f"Branch: {branch}")
+```
+
+### Compare metrics across branches
+
+```python
+import dvc.api
+
+repo_url = "https://github.com/example/ml-project"
+branches = dvc.api.all_branches(repo=repo_url)
+
+for branch in branches:
+    metrics = dvc.api.metrics_show(repo=repo_url, rev=branch)
+    print(f"{branch}: {metrics}")
+```
+
+### Iterate over all branches and revisions
+
+```python
+import dvc.api
+
+# Get all branches
+branches = dvc.api.all_branches()
+
+# Process each branch
+for branch in branches:
+    print(f"\nProcessing branch: {branch}")
+    
+    # Get parameters for this branch
+    params = dvc.api.params_show(rev=branch)
+    print(f"  Parameters: {params}")
+    
+    # Get metrics for this branch
+    metrics = dvc.api.metrics_show(rev=branch)
+    print(f"  Metrics: {metrics}")
+```
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Branch comparison" icon="code-compare">
+    Compare metrics or parameters across different branches
+  </Card>
+  <Card title="CI/CD workflows" icon="gears">
+    Automate testing or deployment across all active branches
+  </Card>
+  <Card title="Branch analysis" icon="chart-line">
+    Analyze experiment results from different development branches
+  </Card>
+  <Card title="Data validation" icon="check">
+    Verify data consistency across branches
+  </Card>
+</CardGroup>
+
+## Related functions
+
+- [`all_commits()`](/api/all_commits) - List all commits in a repository
+- [`all_tags()`](/api/all_tags) - List all Git tags in a repository
+- [`params_show()`](/api/params_show) - Get parameters for a specific revision
+- [`metrics_show()`](/api/metrics_show) - Get metrics for a specific revision

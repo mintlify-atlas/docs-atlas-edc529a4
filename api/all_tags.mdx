@@ -1,0 +1,154 @@
+---
+title: all_tags
+description: Get all Git tags in a DVC repository
+---
+
+## Description
+
+`dvc.api.all_tags()` returns a list of all Git tags in a DVC repository. Tags typically mark important milestones like releases or significant experiments, making this function useful for retrieving versioned data, models, and metrics.
+
+## Signature
+
+```python
+def all_tags(repo: Optional[str] = None) -> list[str]
+```
+
+## Parameters
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository. Defaults to the current project (found by walking up from the current working directory tree).
+  
+  Can be:
+  - Local file system path
+  - URL (HTTP/HTTPS)
+  - Git SSH URL (e.g., `user@server:project.git`)
+</ParamField>
+
+## Returns
+
+<ResponseField name="tags" type="list[str]">
+  List of Git tag names in the repository
+</ResponseField>
+
+## Examples
+
+### List tags in current repository
+
+```python
+import dvc.api
+
+tags = dvc.api.all_tags()
+print(f"Found {len(tags)} tags: {tags}")
+```
+
+### Compare metrics across release tags
+
+```python
+import dvc.api
+
+tags = dvc.api.all_tags()
+
+print("Release metrics:")
+for tag in tags:
+    if tag.startswith('v'):  # Version tags
+        metrics = dvc.api.metrics_show(rev=tag)
+        print(f"{tag}: {metrics}")
+```
+
+### Download model from specific release
+
+```python
+import dvc.api
+
+# Get all release tags
+tags = dvc.api.all_tags(repo="https://github.com/example/ml-project")
+
+# Get latest version tag
+version_tags = [t for t in tags if t.startswith('v')]
+latest = sorted(version_tags)[-1]
+
+print(f"Downloading model from {latest}")
+
+# Read model from that tag
+with dvc.api.open(
+    'models/model.pkl',
+    repo="https://github.com/example/ml-project",
+    rev=latest
+) as f:
+    import pickle
+    model = pickle.load(f)
+```
+
+### Track metrics evolution across releases
+
+```python
+import dvc.api
+import pandas as pd
+
+tags = dvc.api.all_tags()
+release_tags = sorted([t for t in tags if t.startswith('v')])
+
+results = []
+for tag in release_tags:
+    try:
+        metrics = dvc.api.metrics_show(rev=tag)
+        results.append({
+            'release': tag,
+            'accuracy': metrics.get('metrics.json', {}).get('accuracy'),
+            'f1_score': metrics.get('metrics.json', {}).get('f1')
+        })
+    except Exception:
+        continue
+
+df = pd.DataFrame(results)
+print(df)
+```
+
+### Compare production models
+
+```python
+import dvc.api
+
+# Get all production tags
+tags = dvc.api.all_tags()
+prod_tags = [t for t in tags if 'prod' in t.lower()]
+
+print(f"Found {len(prod_tags)} production releases:\n")
+
+for tag in prod_tags:
+    print(f"{tag}:")
+    
+    # Get model parameters
+    params = dvc.api.params_show(rev=tag)
+    print(f"  Model: {params.get('train', {}).get('model_type')}")
+    
+    # Get performance metrics
+    metrics = dvc.api.metrics_show(rev=tag)
+    print(f"  Accuracy: {metrics.get('metrics.json', {}).get('accuracy')}")
+    print()
+```
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Release comparison" icon="tag">
+    Compare metrics and data across different releases
+  </Card>
+  <Card title="Model registry" icon="cube">
+    Use tags as a simple model registry for versioned models
+  </Card>
+  <Card title="Reproducibility" icon="rotate">
+    Retrieve exact data and model versions from tagged releases
+  </Card>
+  <Card title="Deployment" icon="rocket">
+    Deploy specific tagged versions to production
+  </Card>
+</CardGroup>
+
+## Related functions
+
+- [`all_branches()`](/api/all_branches) - List all branches in a repository
+- [`all_commits()`](/api/all_commits) - List all commits in a repository
+- [`params_show()`](/api/params_show) - Get parameters for a specific tag
+- [`metrics_show()`](/api/metrics_show) - Get metrics for a specific tag
+- [`open()`](/api/open) - Open files from a specific tag
