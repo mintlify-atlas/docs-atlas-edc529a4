@@ -1,0 +1,207 @@
+---
+title: "Tracking Data"
+description: "Learn how to track data files and directories with DVC"
+---
+
+## Overview
+
+DVC helps you version control large data files and directories that are too big for Git. When you track data with DVC, it stores the actual data in a cache and creates small `.dvc` files that Git can track.
+
+<Note>
+  DVC doesn't store your data in Git. Instead, it creates lightweight `.dvc` files (similar to pointers) that track your data's location and version.
+</Note>
+
+## Basic Workflow
+
+<Steps>
+  <Step title="Add data files to DVC">
+    Use `dvc add` to start tracking a file or directory:
+
+    ```bash
+    dvc add data/dataset.csv
+    ```
+
+    This command:
+    - Moves the file to DVC's cache (`.dvc/cache`)
+    - Creates a `data/dataset.csv.dvc` file with metadata
+    - Adds the data file to `.gitignore` automatically
+
+    <Tip>
+      Track entire directories the same way: `dvc add data/images/`
+    </Tip>
+  </Step>
+
+  <Step title="Commit the .dvc file to Git">
+    Now commit the `.dvc` file to version control:
+
+    ```bash
+    git add data/dataset.csv.dvc data/.gitignore
+    git commit -m "Add dataset to DVC"
+    ```
+
+    The `.dvc` file is small (typically just a few lines) and safe to commit to Git.
+  </Step>
+
+  <Step title="Update your data">
+    When your data changes, run `dvc add` again:
+
+    ```bash
+    dvc add data/dataset.csv
+    git add data/dataset.csv.dvc
+    git commit -m "Update dataset with new records"
+    ```
+
+    DVC automatically creates a new version while preserving the old one in cache.
+  </Step>
+</Steps>
+
+## Understanding .dvc Files
+
+When you run `dvc add data/dataset.csv`, DVC creates a `data/dataset.csv.dvc` file:
+
+```yaml data/dataset.csv.dvc
+outs:
+- md5: a3d2f7c8b9e1d4f5a6c7b8d9e0f1a2b3
+  size: 1048576
+  hash: md5
+  path: dataset.csv
+```
+
+<Info>
+  The `.dvc` file contains:
+  - **md5**: Hash of the file content (for detecting changes)
+  - **size**: File size in bytes
+  - **path**: Relative path to the data file
+</Info>
+
+## Advanced Options
+
+### Track Multiple Files with Glob Patterns
+
+Use the `--glob` flag to track files matching a pattern:
+
+```bash
+dvc add --glob 'data/*.csv'
+```
+
+### Track Files Without Caching
+
+Use `--no-commit` to create the `.dvc` file without copying data to cache:
+
+```bash
+dvc add --no-commit large_file.bin
+```
+
+<Warning>
+  With `--no-commit`, your data isn't protected until you run `dvc commit` or `dvc push`.
+</Warning>
+
+### Force Overwrite Existing Tracking
+
+If you need to re-add a file that's already tracked:
+
+```bash
+dvc add --force data/dataset.csv
+```
+
+## Using .dvcignore
+
+Like `.gitignore`, you can create a `.dvcignore` file to exclude files from DVC operations:
+
+```text .dvcignore
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore specific directories
+/data/cache/
+/data/temp/
+
+# Ignore patterns
+**/.DS_Store
+**/Thumbs.db
+```
+
+<Info>
+  `.dvcignore` uses the same syntax as `.gitignore`. Patterns are applied to all DVC commands.
+</Info>
+
+## Common Commands
+
+<CodeGroup>
+
+```bash Add a file
+dvc add data/train.csv
+```
+
+```bash Add a directory
+dvc add data/raw/
+```
+
+```bash Add with glob pattern
+dvc add --glob 'models/*.pkl'
+```
+
+```bash Remove from tracking
+dvc remove data/train.csv.dvc
+```
+
+```bash Check status
+dvc status data/train.csv.dvc
+```
+
+</CodeGroup>
+
+## Example Output
+
+When you run `dvc add`, you'll see output like this:
+
+```bash
+$ dvc add data/dataset.csv
+
+100% Adding...|████████████████████████████████████|1/1 [00:00, 12.34file/s]
+
+To track the changes with git, run:
+
+    git add data/dataset.csv.dvc data/.gitignore
+
+To enable auto staging, run:
+
+    dvc config core.autostage true
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Keep data organized" icon="folder-tree">
+  Store data in dedicated directories like `data/raw/`, `data/processed/`, `data/external/`
+</Card>
+
+<Card title="Track at the right level" icon="bullseye">
+  Track directories when you have many related files, individual files when they change independently
+</Card>
+
+<Card title="Commit .dvc files" icon="git-alt">
+  Always commit `.dvc` files to Git so your team can track data versions
+</Card>
+
+<Card title="Use .dvcignore" icon="ban">
+  Exclude temporary or generated files from DVC operations to keep your cache clean
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Remote Storage" icon="cloud" href="/guide/remote-storage">
+  Set up remote storage to share data with your team
+</Card>
+
+<Card title="Building Pipelines" icon="diagram-project" href="/guide/building-pipelines">
+  Create reproducible ML pipelines with your tracked data
+</Card>
+
+</CardGroup>

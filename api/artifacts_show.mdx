@@ -1,0 +1,586 @@
+---
+title: 'dvc.api.artifacts_show()'
+description: 'Get path and revision information for artifacts in the DVC model registry'
+icon: 'cube'
+---
+
+<Note>
+Source: [dvc/api/artifacts.py:7-58](~/workspace/source/dvc/api/artifacts.py)
+</Note>
+
+## Description
+
+Returns the path and Git revision for an artifact in a DVC project. Artifacts are managed through the DVC model registry and can have versions or be assigned to stages (like staging, production).
+
+The resulting path and revision can be used in conjunction with other `dvc.api` calls (like `open()` or `read()`) to access and work with the artifact.
+
+## Signature
+
+```python
+dvc.api.artifacts_show(
+    name: str,
+    version: Optional[str] = None,
+    stage: Optional[str] = None,
+    repo: Optional[str] = None,
+) -> dict[str, str]
+```
+
+## Parameters
+
+<ParamField path="name" type="str" required>
+  Name of the artifact to look up.
+  
+  The artifact name is defined in the model registry and typically corresponds to a model or dataset.
+  
+  ```python
+  name="my-model"
+  name="classifier-v2"
+  name="production-model"
+  ```
+</ParamField>
+
+<ParamField path="version" type="str" default="None">
+  Version of the artifact to retrieve. Defaults to the latest version if not specified.
+  
+  **Mutually exclusive with `stage`** - you can specify either version or stage, not both.
+  
+  ```python
+  version="v1"
+  version="v2.0.1"
+  version="1"
+  ```
+</ParamField>
+
+<ParamField path="stage" type="str" default="None">
+  Name of the model registry stage.
+  
+  Common stages include "staging", "production", "dev", etc.
+  
+  **Mutually exclusive with `version`** - you can specify either version or stage, not both.
+  
+  ```python
+  stage="production"
+  stage="staging"
+  stage="dev"
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Path or URL for the DVC repository.
+  
+  - Defaults to the current project
+  - Can be a local path or remote URL
+  - Both HTTP and SSH protocols are supported
+  
+  ```python
+  repo="https://github.com/user/ml-project"
+  repo="/path/to/local/repo"
+  repo="git@github.com:company/models.git"
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="artifact_info" type="dict[str, str]">
+  A dictionary containing the artifact's Git revision and file path:
+  
+  ```python
+  {
+      "rev": "abc123def456...",  # Git commit hash
+      "path": "models/classifier.pkl"  # Relative path to artifact
+  }
+  ```
+  
+  - **rev**: The Git revision (commit hash) where the artifact is stored
+  - **path**: The relative path to the artifact file within the repository
+</ResponseField>
+
+## Raises
+
+<ResponseField name="ArtifactNotFoundError" type="exception">
+  Raised when the specified artifact was not found in the repository.
+</ResponseField>
+
+<ResponseField name="ValueError" type="exception">
+  Raised when both `version` and `stage` are specified (they are mutually exclusive).
+</ResponseField>
+
+## Examples
+
+### Get Latest Version of Artifact
+
+```python
+import dvc.api
+
+# Get the latest version
+artifact = dvc.api.artifacts_show("my-classifier")
+
+print(f"Revision: {artifact['rev']}")
+print(f"Path: {artifact['path']}")
+# Output:
+# Revision: abc123def456...
+# Path: models/classifier.pkl
+```
+
+### Get Specific Version
+
+```python
+import dvc.api
+
+# Get a specific version
+artifact_v1 = dvc.api.artifacts_show("my-classifier", version="v1")
+artifact_v2 = dvc.api.artifacts_show("my-classifier", version="v2")
+
+print(f"V1 path: {artifact_v1['path']}")
+print(f"V2 path: {artifact_v2['path']}")
+```
+
+### Get Artifact from Registry Stage
+
+```python
+import dvc.api
+
+# Get artifact assigned to production stage
+prod_artifact = dvc.api.artifacts_show(
+    "my-model",
+    stage="production"
+)
+
+print(f"Production model at: {prod_artifact['path']}")
+print(f"From revision: {prod_artifact['rev']}")
+```
+
+### Load Artifact Using Returned Info
+
+```python
+import dvc.api
+import pickle
+
+# Get artifact info
+artifact = dvc.api.artifacts_show("my-model", stage="production")
+
+# Use the info to read the artifact
+model_data = dvc.api.read(
+    artifact["path"],
+    rev=artifact["rev"],
+    mode="rb"
+)
+
+# Load the model
+model = pickle.loads(model_data)
+predictions = model.predict(X_test)
+```
+
+### Open Artifact with Context Manager
+
+```python
+import dvc.api
+import pickle
+
+# Get artifact location
+artifact = dvc.api.artifacts_show("classifier", version="v3")
+
+# Stream the artifact
+with dvc.api.open(
+    artifact["path"],
+    rev=artifact["rev"],
+    mode="rb"
+) as f:
+    model = pickle.load(f)
+    
+results = model.predict(test_data)
+```
+
+### Compare Staging and Production
+
+```python
+import dvc.api
+
+# Get staging and production versions
+staging = dvc.api.artifacts_show("my-model", stage="staging")
+production = dvc.api.artifacts_show("my-model", stage="production")
+
+print("Staging:")
+print(f"  Rev: {staging['rev']}")
+print(f"  Path: {staging['path']}")
+
+print("\nProduction:")
+print(f"  Rev: {production['rev']}")
+print(f"  Path: {production['path']}")
+
+if staging['rev'] != production['rev']:
+    print("\nStaging and production are on different revisions")
+```
+
+### Remote Repository Access
+
+```python
+import dvc.api
+
+# Get artifact from remote repository
+artifact = dvc.api.artifacts_show(
+    "shared-model",
+    version="v2",
+    repo="https://github.com/company/ml-models"
+)
+
+print(f"Remote artifact: {artifact['path']} @ {artifact['rev'][:7]}")
+```
+
+### Handle Multiple Artifacts
+
+```python
+import dvc.api
+
+artifact_names = ["model-a", "model-b", "model-c"]
+artifacts = {}
+
+for name in artifact_names:
+    try:
+        artifact = dvc.api.artifacts_show(name, stage="production")
+        artifacts[name] = artifact
+        print(f"✓ {name}: {artifact['path']}")
+    except Exception as e:
+        print(f"✗ {name}: {e}")
+
+print(f"\nFound {len(artifacts)} production artifacts")
+```
+
+### Download Artifact to Local File
+
+```python
+import dvc.api
+import requests
+
+# Get artifact info
+artifact = dvc.api.artifacts_show("my-model", stage="production")
+
+# Get the URL
+url = dvc.api.get_url(
+    artifact["path"],
+    rev=artifact["rev"]
+)
+
+# Download if it's an HTTP URL
+if url.startswith("http"):
+    response = requests.get(url)
+    with open("local_model.pkl", "wb") as f:
+        f.write(response.content)
+    print("Model downloaded to local_model.pkl")
+```
+
+### Error Handling
+
+```python
+import dvc.api
+from dvc.exceptions import ArtifactNotFoundError
+
+try:
+    artifact = dvc.api.artifacts_show(
+        "my-model",
+        version="v5",
+        repo="https://github.com/user/repo"
+    )
+    print(f"Found: {artifact['path']}")
+except ArtifactNotFoundError:
+    print("Artifact not found in registry")
+except ValueError as e:
+    print(f"Invalid parameters: {e}")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### List All Versions
+
+```python
+import dvc.api
+
+model_name = "classifier"
+versions = ["v1", "v2", "v3", "v4"]
+
+print(f"Versions of {model_name}:\n")
+
+for version in versions:
+    try:
+        artifact = dvc.api.artifacts_show(model_name, version=version)
+        print(f"{version}:")
+        print(f"  Path: {artifact['path']}")
+        print(f"  Rev: {artifact['rev'][:7]}")
+    except ArtifactNotFoundError:
+        print(f"{version}: Not found")
+```
+
+### Validate Stage Assignment
+
+```python
+import dvc.api
+
+def get_production_model(name):
+    """Get production model, with fallback to staging."""
+    try:
+        return dvc.api.artifacts_show(name, stage="production")
+    except ArtifactNotFoundError:
+        print(f"No production version, trying staging...")
+        try:
+            return dvc.api.artifacts_show(name, stage="staging")
+        except ArtifactNotFoundError:
+            raise ValueError(f"No production or staging version for {name}")
+
+artifact = get_production_model("my-classifier")
+print(f"Using: {artifact['path']}")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Model Deployment" icon="rocket">
+  Retrieve production models for deployment in inference services.
+</Card>
+
+<Card title="Version Management" icon="code-branch">
+  Access specific versions of models from the registry.
+</Card>
+
+<Card title="Stage Promotion" icon="arrow-up">
+  Get artifacts from different stages (dev, staging, production).
+</Card>
+
+<Card title="Model Comparison" icon="code-compare">
+  Compare different versions or stages of the same artifact.
+</Card>
+
+</CardGroup>
+
+## Model Registry Integration
+
+Artifacts are managed through the DVC model registry. Here's how they work:
+
+<Steps>
+  <Step title="Register an artifact">
+    ```bash
+    dvc artifacts add my-model models/classifier.pkl
+    ```
+  </Step>
+  
+  <Step title="Create versions">
+    ```bash
+    # Version is created automatically
+    dvc artifacts add my-model models/classifier_v2.pkl
+    ```
+  </Step>
+  
+  <Step title="Assign to stage">
+    ```bash
+    dvc artifacts assign my-model --stage production --version v2
+    ```
+  </Step>
+  
+  <Step title="Access programmatically">
+    ```python
+    artifact = dvc.api.artifacts_show("my-model", stage="production")
+    ```
+  </Step>
+</Steps>
+
+## Version vs Stage
+
+<Tabs>
+  <Tab title="Version">
+    Use `version` when you need a specific version of an artifact:
+    
+    ```python
+    # Get exact version
+    artifact = dvc.api.artifacts_show("model", version="v2.1.0")
+    
+    # Good for:
+    # - Reproducibility
+    # - Testing specific versions
+    # - Rollback scenarios
+    ```
+  </Tab>
+  
+  <Tab title="Stage">
+    Use `stage` when you want the current artifact for an environment:
+    
+    ```python
+    # Get whatever is currently in production
+    artifact = dvc.api.artifacts_show("model", stage="production")
+    
+    # Good for:
+    # - Deployment pipelines
+    # - Environment-specific configs
+    # - Promotion workflows
+    ```
+  </Tab>
+  
+  <Tab title="Latest">
+    Omit both to get the most recent version:
+    
+    ```python
+    # Get latest version
+    artifact = dvc.api.artifacts_show("model")
+    
+    # Good for:
+    # - Development
+    # - Testing newest changes
+    # - Quick access
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Use stages for deployment">
+  In deployment pipelines, use stages rather than hardcoding versions:
+  
+  ```python
+  # ✅ Good - Flexible, follows stage assignments
+  artifact = dvc.api.artifacts_show("model", stage="production")
+  
+  # ❌ Bad - Hardcoded, requires code changes
+  artifact = dvc.api.artifacts_show("model", version="v2")
+  ```
+</Accordion>
+
+<Accordion title="Use versions for reproducibility">
+  When you need exact reproducibility, use specific versions:
+  
+  ```python
+  # For reproducing results from a paper
+  artifact = dvc.api.artifacts_show(
+      "research-model",
+      version="v1.0.0",  # Exact version from publication
+      repo="https://github.com/lab/research-repo"
+  )
+  ```
+</Accordion>
+
+<Accordion title="Combine with other API functions">
+  Use the returned info with other `dvc.api` functions:
+  
+  ```python
+  # Get artifact location
+  artifact = dvc.api.artifacts_show("model", stage="production")
+  
+  # Load the artifact
+  with dvc.api.open(artifact["path"], rev=artifact["rev"], mode="rb") as f:
+      model = pickle.load(f)
+  
+  # Or get the URL
+  url = dvc.api.get_url(artifact["path"], rev=artifact["rev"])
+  ```
+</Accordion>
+
+<Accordion title="Handle missing artifacts gracefully">
+  Always handle the case where an artifact might not exist:
+  
+  ```python
+  from dvc.exceptions import ArtifactNotFoundError
+  
+  try:
+      artifact = dvc.api.artifacts_show("model", stage="production")
+  except ArtifactNotFoundError:
+      # Fall back to staging or default
+      print("No production model, using staging")
+      artifact = dvc.api.artifacts_show("model", stage="staging")
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Common Patterns
+
+### Deployment Script
+
+```python
+import dvc.api
+import pickle
+import os
+
+def deploy_model(model_name, stage="production"):
+    """Deploy a model from the registry."""
+    
+    # Get artifact info
+    artifact = dvc.api.artifacts_show(model_name, stage=stage)
+    
+    print(f"Deploying {model_name} from {stage} stage")
+    print(f"  Revision: {artifact['rev'][:7]}")
+    print(f"  Path: {artifact['path']}")
+    
+    # Load model
+    model_data = dvc.api.read(
+        artifact["path"],
+        rev=artifact["rev"],
+        mode="rb"
+    )
+    model = pickle.loads(model_data)
+    
+    # Save locally for serving
+    os.makedirs("deployed_models", exist_ok=True)
+    with open(f"deployed_models/{model_name}.pkl", "wb") as f:
+        f.write(model_data)
+    
+    print(f"✓ Model deployed successfully")
+    return model
+
+# Deploy production model
+model = deploy_model("my-classifier", stage="production")
+```
+
+### Model Version Comparison
+
+```python
+import dvc.api
+import pickle
+
+def compare_versions(model_name, v1, v2, test_data):
+    """Compare two versions of a model."""
+    
+    results = {}
+    
+    for version in [v1, v2]:
+        artifact = dvc.api.artifacts_show(model_name, version=version)
+        
+        with dvc.api.open(artifact["path"], rev=artifact["rev"], mode="rb") as f:
+            model = pickle.load(f)
+        
+        predictions = model.predict(test_data)
+        accuracy = calculate_accuracy(predictions, test_labels)
+        
+        results[version] = {
+            "accuracy": accuracy,
+            "path": artifact["path"],
+            "rev": artifact["rev"]
+        }
+    
+    return results
+
+# Compare versions
+comparison = compare_versions("classifier", "v1", "v2", X_test)
+print(comparison)
+```
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read artifact contents
+</Card>
+
+<Card title="open()" icon="folder-open" href="/api/open">
+  Stream artifact data
+</Card>
+
+<Card title="get_url()" icon="link" href="/api/get_url">
+  Get artifact storage URL
+</Card>
+
+</CardGroup>
+
+<Info>
+**Learn More**: See the [DVC Model Registry documentation](https://dvc.org/doc/use-cases/model-registry) for details on managing artifacts.
+</Info>

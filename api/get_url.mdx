@@ -1,0 +1,510 @@
+---
+title: 'dvc.api.get_url()'
+description: 'Get the remote storage URL for DVC-tracked files without downloading them'
+icon: 'link'
+---
+
+<Note>
+Source: [dvc/api/data.py:28-90](~/workspace/source/dvc/api/data.py)
+</Note>
+
+## Description
+
+Returns the URL to the storage location of a data file or directory tracked in a DVC repository. This function provides direct access to the remote storage URL without downloading the file.
+
+<Warning>
+This function does **not** check for the actual existence of the file in remote storage. It only returns the expected URL based on DVC metadata.
+</Warning>
+
+For Git repositories, `HEAD` is used unless a `rev` argument is supplied. The default remote is tried unless a `remote` argument is supplied.
+
+## Signature
+
+```python
+dvc.api.get_url(
+    path: str,
+    repo: Optional[str] = None,
+    rev: Optional[str] = None,
+    remote: Optional[str] = None,
+    config: Optional[dict[str, Any]] = None,
+    remote_config: Optional[dict[str, Any]] = None,
+) -> str
+```
+
+## Parameters
+
+<ParamField path="path" type="str" required>
+  Location and filename of the target, relative to the root of the repository.
+  
+  ```python
+  path="data/train.csv"
+  path="models/weights.h5"
+  path="features/"
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC project or Git repository. Defaults to the current DVC project (found by walking up from the current working directory).
+  
+  Can be:
+  - A URL to a Git repository
+  - A local file system path
+  - Both HTTP and SSH protocols are supported for online Git repos
+  
+  ```python
+  repo="https://github.com/iterative/example-get-started"
+  repo="git@server.com:user/project.git"
+  repo="/path/to/local/repo"
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Any Git revision such as a branch or tag name, a commit hash, or a DVC experiment name.
+  
+  - Defaults to `HEAD` for Git repositories
+  - If `repo` is not a Git repo, this option is ignored
+  
+  ```python
+  rev="main"
+  rev="v1.0.0"
+  rev="abc123def"
+  rev="exp-tuned-model"
+  ```
+</ParamField>
+
+<ParamField path="remote" type="str" default="None">
+  Name of the DVC remote used to form the returned URL string.
+  
+  - Defaults to the default remote of the repository
+  - For local projects, the cache is tried before the default remote
+  
+  ```python
+  remote="myremote"
+  remote="s3-storage"
+  remote="azure-backup"
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  Config dictionary to be passed to the DVC repository.
+  
+  ```python
+  config={"cache": {"type": "symlink"}}
+  ```
+</ParamField>
+
+<ParamField path="remote_config" type="dict" default="None">
+  Remote config dictionary to be passed to the DVC repository.
+  
+  ```python
+  remote_config={
+      "url": "s3://mybucket/cache",
+      "region": "us-west-2"
+  }
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="url" type="str">
+  The URL to the file or directory in remote storage. The format depends on the remote type:
+  
+  - **S3**: `s3://bucket-name/path/to/file`
+  - **GCS**: `gs://bucket-name/path/to/file`
+  - **Azure**: `azure://container/path/to/file`
+  - **HTTP**: `https://server.com/path/to/file`
+  - **SSH**: `ssh://user@server/path/to/file`
+  - **Local**: `file:///path/to/file`
+</ResponseField>
+
+## Raises
+
+<ResponseField name="OutputNotFoundError" type="exception">
+  Raised when the file is not tracked by DVC.
+</ResponseField>
+
+<ResponseField name="NoRemoteError" type="exception">
+  Raised when no remote is configured or specified.
+</ResponseField>
+
+<ResponseField name="NoRemoteInExternalRepoError" type="exception">
+  Raised when accessing an external repository with no remote configured.
+</ResponseField>
+
+## Examples
+
+### Basic Usage
+
+```python
+import dvc.api
+
+url = dvc.api.get_url(
+    'data/model.pkl',
+    repo='https://github.com/iterative/example-get-started'
+)
+print(url)
+# Output: s3://dvc-public/remote/example-get-started/a3/04afb96060aad90176268345e10355
+```
+
+### Get URL from Specific Remote
+
+```python
+import dvc.api
+
+# Specify which remote to use
+url = dvc.api.get_url(
+    'data/features.csv',
+    remote='s3-backup'
+)
+print(url)
+```
+
+### Access Different Versions
+
+```python
+import dvc.api
+
+# Get URL from production branch
+prod_url = dvc.api.get_url(
+    'models/classifier.pkl',
+    rev='production'
+)
+
+# Get URL from development branch
+dev_url = dvc.api.get_url(
+    'models/classifier.pkl',
+    rev='development'
+)
+
+print(f"Production model: {prod_url}")
+print(f"Development model: {dev_url}")
+```
+
+### Download with External Tool
+
+```python
+import dvc.api
+import requests
+
+# Get URL and download with requests
+url = dvc.api.get_url('data/dataset.csv')
+
+if url.startswith('https://'):
+    response = requests.get(url)
+    with open('local_dataset.csv', 'wb') as f:
+        f.write(response.content)
+```
+
+### Use with AWS CLI
+
+```python
+import dvc.api
+import subprocess
+
+# Get S3 URL
+url = dvc.api.get_url(
+    'data/large_file.bin',
+    repo='https://github.com/user/ml-project'
+)
+
+if url.startswith('s3://'):
+    # Download using AWS CLI
+    subprocess.run(['aws', 's3', 'cp', url, 'local_file.bin'])
+```
+
+### Check Multiple Files
+
+```python
+import dvc.api
+
+files = ['data/train.csv', 'data/test.csv', 'data/validation.csv']
+
+for file_path in files:
+    try:
+        url = dvc.api.get_url(file_path)
+        print(f"{file_path}: {url}")
+    except Exception as e:
+        print(f"{file_path}: Error - {e}")
+```
+
+### Get Directory URL
+
+```python
+import dvc.api
+
+# Get URL for an entire directory
+dir_url = dvc.api.get_url(
+    'data/images/',
+    repo='https://github.com/user/vision-project'
+)
+print(f"Directory URL: {dir_url}")
+```
+
+### From Specific Tag
+
+```python
+import dvc.api
+
+# Get URL from a tagged release
+url = dvc.api.get_url(
+    'models/model-v2.pkl',
+    rev='v2.0.0',
+    repo='https://github.com/company/ml-models'
+)
+print(f"Release v2.0.0 model URL: {url}")
+```
+
+### Error Handling
+
+```python
+import dvc.api
+from dvc.exceptions import OutputNotFoundError
+from dvc.config import NoRemoteError
+
+try:
+    url = dvc.api.get_url('data/file.csv')
+    print(f"URL: {url}")
+except OutputNotFoundError:
+    print("File is not tracked by DVC")
+except NoRemoteError:
+    print("No remote configured")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### Custom Remote Configuration
+
+```python
+import dvc.api
+
+url = dvc.api.get_url(
+    'data/dataset.parquet',
+    remote='custom-s3',
+    remote_config={
+        'url': 's3://my-custom-bucket/dvc-cache',
+        'region': 'eu-west-1'
+    }
+)
+print(url)
+```
+
+### Generate Presigned URL (S3)
+
+```python
+import dvc.api
+import boto3
+from urllib.parse import urlparse
+
+# Get S3 URL from DVC
+url = dvc.api.get_url('data/private_data.csv')
+
+# Parse S3 URL
+parsed = urlparse(url)
+bucket = parsed.netloc
+key = parsed.path.lstrip('/')
+
+# Generate presigned URL
+s3_client = boto3.client('s3')
+presigned_url = s3_client.generate_presigned_url(
+    'get_object',
+    Params={'Bucket': bucket, 'Key': key},
+    ExpiresIn=3600
+)
+
+print(f"Presigned URL (expires in 1 hour): {presigned_url}")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Direct Downloads" icon="download">
+  Download files using external tools like wget, curl, or AWS CLI.
+</Card>
+
+<Card title="URL Sharing" icon="share-nodes">
+  Share direct URLs to data with team members or services.
+</Card>
+
+<Card title="Integration" icon="plug">
+  Integrate DVC-tracked data with other tools and services.
+</Card>
+
+<Card title="Presigned URLs" icon="key">
+  Generate temporary access URLs for private cloud storage.
+</Card>
+
+</CardGroup>
+
+## Remote Storage URL Formats
+
+<Tabs>
+  <Tab title="S3">
+    ```python
+    url = dvc.api.get_url('data.csv', remote='s3')
+    # Returns: s3://bucket-name/path/to/hash
+    ```
+  </Tab>
+  
+  <Tab title="Google Cloud Storage">
+    ```python
+    url = dvc.api.get_url('data.csv', remote='gcs')
+    # Returns: gs://bucket-name/path/to/hash
+    ```
+  </Tab>
+  
+  <Tab title="Azure Blob">
+    ```python
+    url = dvc.api.get_url('data.csv', remote='azure')
+    # Returns: azure://container/path/to/hash
+    ```
+  </Tab>
+  
+  <Tab title="HTTP/HTTPS">
+    ```python
+    url = dvc.api.get_url('data.csv', remote='http')
+    # Returns: https://server.com/path/to/hash
+    ```
+  </Tab>
+  
+  <Tab title="SSH">
+    ```python
+    url = dvc.api.get_url('data.csv', remote='ssh')
+    # Returns: ssh://user@host/path/to/hash
+    ```
+  </Tab>
+</Tabs>
+
+## Important Notes
+
+<Warning>
+**File Existence**: This function does NOT verify that the file actually exists in remote storage. It only constructs and returns the expected URL based on DVC metadata.
+</Warning>
+
+<Info>
+**Cache Priority**: For local projects, DVC will try to get the URL from the local cache before checking the default remote.
+</Info>
+
+<Tip>
+**Direct Access**: The returned URL can often be used directly with cloud provider tools (aws, gsutil, az) or HTTP clients for downloading.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Verify file existence">
+  Since `get_url()` doesn't check if the file exists, verify before using:
+  
+  ```python
+  import dvc.api
+  import requests
+  
+  url = dvc.api.get_url('data.csv')
+  
+  # Verify file exists (for HTTP URLs)
+  if url.startswith('http'):
+      response = requests.head(url)
+      if response.status_code == 200:
+          print("File exists")
+      else:
+          print("File not found in storage")
+  ```
+</Accordion>
+
+<Accordion title="Use for large files">
+  For very large files, getting the URL allows you to use optimized download tools:
+  
+  ```python
+  import dvc.api
+  import subprocess
+  
+  url = dvc.api.get_url('large_dataset.tar.gz')
+  
+  # Use aria2c for parallel downloads
+  subprocess.run(['aria2c', '-x', '16', '-s', '16', url])
+  ```
+</Accordion>
+
+<Accordion title="Handle different storage types">
+  Parse URLs appropriately based on storage type:
+  
+  ```python
+  import dvc.api
+  from urllib.parse import urlparse
+  
+  url = dvc.api.get_url('data.csv')
+  parsed = urlparse(url)
+  
+  if parsed.scheme == 's3':
+      print(f"S3 bucket: {parsed.netloc}")
+      print(f"S3 key: {parsed.path}")
+  elif parsed.scheme == 'gs':
+      print(f"GCS bucket: {parsed.netloc}")
+  elif parsed.scheme in ['http', 'https']:
+      print(f"HTTP URL: {url}")
+  ```
+</Accordion>
+
+<Accordion title="Consider authentication">
+  Remember that accessing the URL may require authentication:
+  
+  ```python
+  import dvc.api
+  
+  # Get URL (may be private)
+  url = dvc.api.get_url('private_data.csv', remote='s3')
+  
+  # Ensure AWS credentials are configured
+  # export AWS_ACCESS_KEY_ID=...
+  # export AWS_SECRET_ACCESS_KEY=...
+  
+  # Or use boto3 session
+  import boto3
+  session = boto3.Session(profile_name='myprofile')
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Comparison with Other Functions
+
+| Function | Purpose | Downloads Data |
+|----------|---------|----------------|
+| `get_url()` | Get remote URL | No |
+| `read()` | Read file contents | Yes (in memory) |
+| `open()` | Stream file contents | Yes (streaming) |
+
+```python
+import dvc.api
+
+# get_url() - Just returns the URL
+url = dvc.api.get_url('data.csv')
+print(url)  # s3://bucket/path/hash
+
+# read() - Downloads and returns contents
+data = dvc.api.read('data.csv')
+print(len(data))  # Size in bytes
+
+# open() - Downloads and streams
+with dvc.api.open('data.csv') as f:
+    first_line = f.readline()
+```
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read complete file contents
+</Card>
+
+<Card title="open()" icon="folder-open" href="/api/open">
+  Stream file with context manager
+</Card>
+
+<Card title="DVCFileSystem" icon="folder-tree" href="/api/dvcfilesystem">
+  File system interface
+</Card>
+
+</CardGroup>

@@ -1,0 +1,678 @@
+---
+title: "Collaboration"
+description: "Work with your team using Git and DVC together"
+---
+
+## Overview
+
+DVC is designed to work seamlessly with Git, enabling teams to collaborate on ML projects just like software projects. While Git tracks code and metadata, DVC tracks data, models, and pipeline outputs.
+
+<Info>
+  The key to DVC collaboration: **Git tracks `.dvc` files**, while **DVC remote storage holds the actual data**.
+</Info>
+
+## The Collaboration Workflow
+
+<Steps>
+  <Step title="Initial setup">
+    The first team member initializes the project:
+
+    ```bash
+    # Initialize DVC
+    dvc init
+    git add .dvc .dvcignore
+    git commit -m "Initialize DVC"
+
+    # Configure remote storage
+    dvc remote add -d storage s3://team-bucket/project-data
+    git add .dvc/config
+    git commit -m "Configure DVC remote"
+
+    # Track data
+    dvc add data/dataset.csv
+    git add data/dataset.csv.dvc data/.gitignore
+    git commit -m "Track dataset with DVC"
+
+    # Push everything
+    git push origin main
+    dvc push
+    ```
+  </Step>
+
+  <Step title="Team members clone">
+    Other team members clone and get data:
+
+    ```bash
+    # Clone repository
+    git clone https://github.com/team/project.git
+    cd project
+
+    # Pull data from DVC remote
+    dvc pull
+    ```
+
+    <Tip>
+      Configure credentials locally: `dvc remote modify --local storage profile myprofile`
+    </Tip>
+  </Step>
+
+  <Step title="Make changes">
+    Team members work independently:
+
+    ```bash
+    # Create feature branch
+    git checkout -b feature/new-model
+
+    # Modify pipeline and data
+    dvc repro
+
+    # Track changes
+    git add dvc.yaml dvc.lock params.yaml
+    git commit -m "Improve model architecture"
+
+    # Push code and data
+    git push origin feature/new-model
+    dvc push
+    ```
+  </Step>
+
+  <Step title="Review and merge">
+    Team reviews and merges changes:
+
+    ```bash
+    # Create pull request in GitHub/GitLab
+    gh pr create --title "Improve model architecture"
+
+    # After approval, merge
+    git checkout main
+    git merge feature/new-model
+
+    # Pull new data
+    dvc pull
+    ```
+  </Step>
+</Steps>
+
+## Sharing Data
+
+### Adding New Data
+
+When you add data to the project:
+
+```bash
+# Track new data
+dvc add data/new_dataset.csv
+
+# Commit metadata to Git
+git add data/new_dataset.csv.dvc data/.gitignore
+git commit -m "Add new dataset"
+
+# Share with team
+git push origin main
+dvc push
+```
+
+Team members get the data:
+
+```bash
+git pull
+dvc pull
+```
+
+### Updating Existing Data
+
+```bash
+# Modify data (e.g., add more samples)
+echo "new,data,rows" >> data/dataset.csv
+
+# Update DVC tracking
+dvc add data/dataset.csv
+
+# Commit and push
+git add data/dataset.csv.dvc
+git commit -m "Update dataset with new samples"
+git push
+dvc push
+```
+
+<Info>
+  DVC automatically versions your data. Old versions remain in the cache and remote storage.
+</Info>
+
+## Sharing Pipelines
+
+### Creating a Pipeline
+
+One team member creates a pipeline:
+
+```bash
+# Build pipeline
+dvc stage add -n preprocess \
+  -d data/raw.csv \
+  -o data/processed.csv \
+  python preprocess.py
+
+dvc stage add -n train \
+  -d data/processed.csv \
+  -p train.lr,train.epochs \
+  -o models/model.pkl \
+  python train.py
+
+# Run and track
+dvc repro
+
+# Commit pipeline definition and lock file
+git add dvc.yaml dvc.lock
+git commit -m "Create preprocessing and training pipeline"
+
+# Push code and outputs
+git push
+dvc push
+```
+
+### Running a Shared Pipeline
+
+Team members reproduce the pipeline:
+
+```bash
+# Get latest code
+git pull
+
+# Get pipeline outputs from remote
+dvc pull
+
+# Or run the pipeline locally
+dvc repro
+```
+
+<Tip>
+  Use `dvc pull` if you just need the results. Use `dvc repro` if you want to re-run the pipeline.
+</Tip>
+
+## Sharing Experiments
+
+### Push Experiments to Git Remote
+
+```bash
+# Run experiments
+dvc exp run -n "baseline" -S train.lr=0.001
+dvc exp run -n "high-lr" -S train.lr=0.01
+
+# Push experiments to Git remote
+dvc exp push origin baseline high-lr
+
+# Or push all experiments
+dvc exp push origin --all
+```
+
+### Pull Team Members' Experiments
+
+```bash
+# List experiments on remote
+dvc exp list origin
+
+# Pull specific experiments
+dvc exp pull origin baseline high-lr
+
+# Or pull all experiments
+dvc exp pull origin --all
+
+# View all experiments (including remote)
+dvc exp show
+```
+
+## Branch-Based Collaboration
+
+### Feature Branch Workflow
+
+<Tabs>
+  <Tab title="Developer 1">
+    ```bash
+    # Create feature branch
+    git checkout -b feature/data-augmentation
+
+    # Modify pipeline
+    dvc stage add -n augment \
+      -d data/raw.csv \
+      -o data/augmented.csv \
+      python augment.py
+
+    dvc repro
+
+    # Commit and push
+    git add dvc.yaml dvc.lock
+    git commit -m "Add data augmentation stage"
+    git push origin feature/data-augmentation
+    dvc push
+    ```
+  </Tab>
+
+  <Tab title="Developer 2">
+    ```bash
+    # Checkout feature branch
+    git checkout feature/data-augmentation
+
+    # Get data and outputs
+    dvc pull
+
+    # Review changes
+    dvc dag
+    dvc metrics show
+
+    # Test pipeline
+    dvc repro
+    ```
+  </Tab>
+</Tabs>
+
+### Merging Branches
+
+```bash
+# Switch to main
+git checkout main
+
+# Merge feature
+git merge feature/data-augmentation
+
+# Resolve any conflicts in dvc.yaml or dvc.lock
+# Then pull corresponding data
+dvc pull
+```
+
+<Warning>
+  If both branches modified the same pipeline stage, you may have merge conflicts in `dvc.yaml` and `dvc.lock`. Resolve them like any Git merge conflict.
+</Warning>
+
+## Handling Merge Conflicts
+
+### Conflicts in .dvc Files
+
+When two branches modify the same data:
+
+```bash
+# dvc.lock shows conflict
+<<<<<<< HEAD
+  prepare:
+    cmd: python prepare.py --version 1
+    md5: abc123
+=======
+  prepare:
+    cmd: python prepare.py --version 2
+    md5: def456
+>>>>>>> feature/new-approach
+```
+
+Resolve by:
+
+<Steps>
+  <Step title="Choose the version you want">
+    Edit the file to keep one version or combine them.
+  </Step>
+
+  <Step title="Re-run the pipeline">
+    ```bash
+    dvc repro
+    ```
+  </Step>
+
+  <Step title="Commit resolved conflict">
+    ```bash
+    git add dvc.lock
+    git commit -m "Resolve pipeline conflict"
+    ```
+  </Step>
+</Steps>
+
+### Conflicts in params.yaml
+
+```bash
+# params.yaml shows conflict
+<<<<<<< HEAD
+train:
+  lr: 0.001
+  epochs: 10
+=======
+train:
+  lr: 0.01
+  epochs: 20
+>>>>>>> feature/hyperparams
+```
+
+Resolve, then re-run:
+
+```bash
+# Edit params.yaml to resolve
+vim params.yaml
+
+# Re-run pipeline with resolved params
+dvc repro
+
+# Commit
+git add params.yaml dvc.lock
+git commit -m "Resolve parameter conflict"
+```
+
+## Working with Data Versions
+
+### Switch to a Previous Data Version
+
+```bash
+# Checkout old commit
+git checkout HEAD~5
+
+# Get corresponding data
+dvc checkout
+```
+
+### Compare Data Across Branches
+
+```bash
+# Compare metrics between branches
+git checkout main
+dvc metrics show
+
+git checkout feature/new-model
+dvc metrics show
+
+# Or use diff
+git diff main feature/new-model -- dvc.lock
+```
+
+## Team Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Always push data" icon="cloud-arrow-up">
+  Run `dvc push` after `git push` to ensure team members can access your data
+</Card>
+
+<Card title="Pull before starting work" icon="rotate">
+  Run `git pull && dvc pull` to get the latest code and data
+</Card>
+
+<Card title="Use feature branches" icon="code-branch">
+  Create branches for experiments and features, merge to main when ready
+</Card>
+
+<Card title="Document pipelines" icon="book">
+  Add descriptions to stages with `--desc` for team clarity
+</Card>
+
+<Card title="Share experiments" icon="flask">
+  Push experiments with `dvc exp push origin --all` so the team can review
+</Card>
+
+<Card title="Automate with CI/CD" icon="gears">
+  Set up CI/CD to run `dvc repro` and validate pipelines automatically
+</Card>
+
+</CardGroup>
+
+## Setting Up CI/CD
+
+### GitHub Actions Example
+
+```yaml .github/workflows/train.yml
+name: Train Model
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install dvc[s3] -r requirements.txt
+      
+      - name: Configure DVC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          dvc remote modify storage --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify storage --local secret_access_key $AWS_SECRET_ACCESS_KEY
+      
+      - name: Pull data
+        run: dvc pull
+      
+      - name: Run pipeline
+        run: dvc repro
+      
+      - name: Show metrics
+        run: dvc metrics show
+```
+
+### GitLab CI Example
+
+```yaml .gitlab-ci.yml
+stages:
+  - train
+
+train_model:
+  stage: train
+  image: python:3.10
+  script:
+    - pip install dvc[s3] -r requirements.txt
+    - dvc remote modify storage --local access_key_id $AWS_ACCESS_KEY_ID
+    - dvc remote modify storage --local secret_access_key $AWS_SECRET_ACCESS_KEY
+    - dvc pull
+    - dvc repro
+    - dvc metrics show
+  only:
+    - main
+    - merge_requests
+```
+
+## Multi-Team Scenarios
+
+### Data Science Team + Engineering Team
+
+<Steps>
+  <Step title="Data science team">
+    ```bash
+    # DS team works on experiments
+    dvc exp run -n "bert-model" -S model.type=bert
+    dvc exp push origin bert-model
+    
+    # When satisfied, promote to branch
+    dvc exp branch bert-model production-candidate
+    git push origin production-candidate
+    ```
+  </Step>
+
+  <Step title="Engineering team">
+    ```bash
+    # Engineers pull candidate model
+    git checkout production-candidate
+    dvc pull
+    
+    # Test in production environment
+    python test_production.py
+    
+    # Deploy if successful
+    dvc push -r production
+    ```
+  </Step>
+</Steps>
+
+### Regional Teams with Different Data
+
+```bash
+# Configure multiple remotes
+dvc remote add us-data s3://us-bucket/data
+dvc remote add eu-data s3://eu-bucket/data
+
+# US team
+dvc remote default us-data
+dvc pull
+
+# EU team  
+dvc remote default eu-data
+dvc pull
+```
+
+## Access Control
+
+### Read-Only Access
+
+Give some team members read-only access:
+
+```bash
+# Team member with read-only credentials
+dvc pull  # Works
+dvc push   # Fails with permission error
+```
+
+### Separate Credentials
+
+Each team member uses their own credentials:
+
+```bash
+# Configure credentials locally (not committed)
+dvc remote modify --local storage profile alice-profile
+```
+
+## Troubleshooting Collaboration Issues
+
+<AccordionGroup>
+  <Accordion title="Data not found after git pull">
+    Remember to run `dvc pull` after `git pull`:
+    ```bash
+    git pull
+    dvc pull
+    ```
+    
+    Or combine them:
+    ```bash
+    git pull && dvc pull
+    ```
+  </Accordion>
+
+  <Accordion title="Merge conflicts in dvc.lock">
+    Usually safe to accept one version and re-run:
+    ```bash
+    # Accept their version
+    git checkout --theirs dvc.lock
+    
+    # Re-run pipeline
+    dvc repro
+    
+    # Commit
+    git add dvc.lock
+    git commit -m "Resolve dvc.lock conflict"
+    ```
+  </Accordion>
+
+  <Accordion title="Outdated cache">
+    If cache is out of sync:
+    ```bash
+    # Remove local cache
+    dvc cache dir .dvc/cache
+    
+    # Re-pull from remote
+    dvc pull -f
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors">
+    Check remote credentials:
+    ```bash
+    # View configuration
+    dvc remote list
+    dvc config -l
+    
+    # Test remote access
+    dvc push --dry-run
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Complete Team Workflow Example
+
+<Steps>
+  <Step title="Project lead initializes">
+    ```bash
+    dvc init
+    dvc remote add -d storage s3://team-bucket/ml-project
+    git add .dvc .dvcignore .dvc/config
+    git commit -m "Initialize DVC"
+    git push
+    ```
+  </Step>
+
+  <Step title="Data engineer adds data">
+    ```bash
+    git pull
+    dvc add data/raw/dataset.csv
+    git add data/raw/dataset.csv.dvc data/.gitignore
+    git commit -m "Add raw dataset"
+    git push
+    dvc push
+    ```
+  </Step>
+
+  <Step title="ML engineer builds pipeline">
+    ```bash
+    git pull
+    dvc pull
+    
+    dvc stage add -n train -d data/raw/dataset.csv -o models/model.pkl python train.py
+    dvc repro
+    
+    git add dvc.yaml dvc.lock
+    git commit -m "Add training pipeline"
+    git push
+    dvc push
+    ```
+  </Step>
+
+  <Step title="Team runs experiments">
+    ```bash
+    git pull
+    dvc pull
+    
+    dvc exp run -n "exp1" -S lr=0.01
+    dvc exp run -n "exp2" -S lr=0.001
+    
+    dvc exp push origin --all
+    ```
+  </Step>
+
+  <Step title="Team reviews results">
+    ```bash
+    dvc exp pull origin --all
+    dvc exp show --sort-by accuracy
+    
+    # Promote best experiment
+    dvc exp branch exp1 production
+    git checkout production
+    git push origin production
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="CI/CD Integration" icon="gears" href="/guide/collaboration#cicd-integration">
+  Automate your ML workflows with continuous integration
+</Card>
+
+<Card title="Command Reference" icon="terminal" href="/commands/overview">
+  Explore all DVC commands for advanced collaboration
+</Card>
+
+</CardGroup>

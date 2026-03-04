@@ -1,0 +1,611 @@
+---
+title: 'dvc.api.exp_show()'
+description: 'Retrieve and compare DVC experiments programmatically'
+icon: 'flask'
+---
+
+<Note>
+Source: [dvc/api/experiments.py:62-120](~/workspace/source/dvc/api/experiments.py)
+</Note>
+
+## Description
+
+Retrieves DVC experiments tracked in a repository. Without arguments, this function retrieves all experiments derived from the Git `HEAD`.
+
+This function provides programmatic access to experiment data, including parameters, metrics, and metadata, making it easy to analyze, compare, and report on experiments.
+
+## Signature
+
+```python
+dvc.api.exp_show(
+    repo: Optional[str] = None,
+    revs: Optional[Union[str, list[str]]] = None,
+    num: int = 1,
+    param_deps: bool = False,
+    force: bool = False,
+    config: Optional[dict] = None,
+) -> list[dict]
+```
+
+## Parameters
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository.
+  
+  - Defaults to the current project (found by walking up from current working directory)
+  - Can be a URL or a file system path
+  - Both HTTP and SSH protocols are supported for online Git repos
+  
+  ```python
+  repo="https://github.com/iterative/example-get-started"
+  repo="git@server.com:user/project.git"
+  repo="/path/to/local/repo"
+  ```
+</ParamField>
+
+<ParamField path="revs" type="Union[str, list[str]]" default="None">
+  Git revision(s) to use as a reference point for listing experiments.
+  
+  - Defaults to `None`, which uses `HEAD` as the starting point
+  - Can be a single string or a list of strings
+  - Each revision can be a branch, tag, or commit SHA
+  
+  ```python
+  revs="main"                      # Single revision
+  revs=["main", "development"]     # Multiple revisions
+  revs="v1.0.0"                    # Tag
+  ```
+</ParamField>
+
+<ParamField path="num" type="int" default="1">
+  Show experiments from the last `num` commits (first parents) starting from the `revs` baseline.
+  
+  - Give a negative value to include all first-parent commits (similar to `git log -n`)
+  - Defaults to `1` (only experiments from the most recent commit)
+  
+  ```python
+  num=1    # Only latest commit
+  num=5    # Last 5 commits
+  num=-1   # All commits
+  ```
+</ParamField>
+
+<ParamField path="param_deps" type="bool" default="False">
+  Include only parameters that are stage dependencies.
+  
+  - When `True`, filters to show only parameters explicitly listed as dependencies
+  - When `False`, shows all parameters
+  
+  ```python
+  param_deps=True  # Only dependency parameters
+  ```
+</ParamField>
+
+<ParamField path="force" type="bool" default="False">
+  Force re-collection of experiments instead of loading from cache.
+  
+  - DVC caches experiment data for performance
+  - Use `force=True` to reload all experiment data and ignore cached results
+  - Useful when you need the most up-to-date data
+  
+  ```python
+  force=True  # Reload from source
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  Config dictionary to be passed through to the DVC project.
+  
+  ```python
+  config={"cache": {"dir": "/tmp/cache"}}
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="experiments" type="list[dict]">
+  A list of dictionaries, where each dictionary contains information about an individual experiment.
+  
+  Each experiment dict includes:
+  - **Experiment**: Name of the experiment
+  - **rev**: Git revision/commit hash
+  - **Created**: Timestamp when created
+  - **State**: Experiment state (Queued, Running, Success, Failed)
+  - **metrics.***: All metrics (e.g., `metrics.accuracy`)
+  - **params.***: All parameters (e.g., `params.train.lr`)
+  
+  ```python
+  [
+      {
+          "Experiment": "exp-random-forest",
+          "rev": "abc123",
+          "Created": "2024-03-04 10:30:45",
+          "metrics.accuracy": 0.92,
+          "params.train.lr": 0.001,
+          "params.train.epochs": 10
+      },
+      {...}
+  ]
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Usage - Show All Experiments
+
+```python
+import dvc.api
+import json
+
+# Get all experiments from HEAD
+experiments = dvc.api.exp_show()
+
+for exp in experiments:
+    print(f"Experiment: {exp.get('Experiment')}")
+    print(f"  Accuracy: {exp.get('metrics.accuracy')}")
+    print(f"  Learning Rate: {exp.get('params.train.lr')}")
+    print()
+```
+
+### Show Experiments from Multiple Commits
+
+```python
+import dvc.api
+
+# Show experiments from last 5 commits
+experiments = dvc.api.exp_show(num=5)
+
+print(f"Found {len(experiments)} experiments across 5 commits")
+```
+
+### Show Experiments from Specific Branch
+
+```python
+import dvc.api
+
+# Get experiments from development branch
+dev_experiments = dvc.api.exp_show(revs="development")
+
+# Get experiments from main branch
+main_experiments = dvc.api.exp_show(revs="main")
+
+print(f"Development: {len(dev_experiments)} experiments")
+print(f"Main: {len(main_experiments)} experiments")
+```
+
+### Compare Experiment Metrics
+
+```python
+import dvc.api
+import pandas as pd
+
+# Get all experiments
+experiments = dvc.api.exp_show(num=-1)
+
+# Extract key metrics
+data = []
+for exp in experiments:
+    data.append({
+        "name": exp.get("Experiment", "baseline"),
+        "accuracy": exp.get("metrics.accuracy"),
+        "f1_score": exp.get("metrics.f1_score"),
+        "training_time": exp.get("metrics.training_time")
+    })
+
+df = pd.DataFrame(data)
+print(df.sort_values("accuracy", ascending=False))
+print(f"\nBest accuracy: {df['accuracy'].max():.4f}")
+```
+
+### Find Best Performing Experiment
+
+```python
+import dvc.api
+
+experiments = dvc.api.exp_show()
+
+# Find experiment with highest accuracy
+best_exp = max(
+    experiments,
+    key=lambda x: x.get("metrics.accuracy", 0)
+)
+
+print(f"Best experiment: {best_exp['Experiment']}")
+print(f"Accuracy: {best_exp['metrics.accuracy']:.4f}")
+print(f"Parameters:")
+for key, value in best_exp.items():
+    if key.startswith("params."):
+        print(f"  {key}: {value}")
+```
+
+### Filter Experiments by Criteria
+
+```python
+import dvc.api
+
+experiments = dvc.api.exp_show()
+
+# Filter experiments with accuracy > 0.90
+high_accuracy = [
+    exp for exp in experiments
+    if exp.get("metrics.accuracy", 0) > 0.90
+]
+
+print(f"Found {len(high_accuracy)} high-performing experiments:")
+for exp in high_accuracy:
+    print(f"  {exp['Experiment']}: {exp['metrics.accuracy']:.4f}")
+```
+
+### Analyze Parameter Impact
+
+```python
+import dvc.api
+import matplotlib.pyplot as plt
+
+experiments = dvc.api.exp_show()
+
+# Extract learning rate vs accuracy
+lr_values = [exp.get("params.train.lr") for exp in experiments]
+accuracy_values = [exp.get("metrics.accuracy") for exp in experiments]
+
+# Filter out None values
+data = [(lr, acc) for lr, acc in zip(lr_values, accuracy_values) if lr and acc]
+lr_values, accuracy_values = zip(*data)
+
+plt.scatter(lr_values, accuracy_values)
+plt.xlabel("Learning Rate")
+plt.ylabel("Accuracy")
+plt.title("Learning Rate vs Accuracy")
+plt.xscale("log")
+plt.show()
+```
+
+### Export Experiments to CSV
+
+```python
+import dvc.api
+import csv
+
+experiments = dvc.api.exp_show(num=-1)
+
+# Get all unique keys
+all_keys = set()
+for exp in experiments:
+    all_keys.update(exp.keys())
+
+# Write to CSV
+with open("experiments.csv", "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=sorted(all_keys))
+    writer.writeheader()
+    writer.writerows(experiments)
+
+print(f"Exported {len(experiments)} experiments to experiments.csv")
+```
+
+### Compare Across Multiple Branches
+
+```python
+import dvc.api
+
+branches = ["main", "feature-1", "feature-2"]
+results = {}
+
+for branch in branches:
+    experiments = dvc.api.exp_show(revs=branch)
+    
+    if experiments:
+        best = max(experiments, key=lambda x: x.get("metrics.accuracy", 0))
+        results[branch] = {
+            "best_exp": best.get("Experiment"),
+            "accuracy": best.get("metrics.accuracy"),
+            "count": len(experiments)
+        }
+
+for branch, data in results.items():
+    print(f"\n{branch}:")
+    print(f"  Best: {data['best_exp']}")
+    print(f"  Accuracy: {data['accuracy']:.4f}")
+    print(f"  Total experiments: {data['count']}")
+```
+
+### Remote Repository Access
+
+```python
+import dvc.api
+
+# Get experiments from remote repository
+experiments = dvc.api.exp_show(
+    repo="https://github.com/iterative/example-get-started",
+    num=-1
+)
+
+print(f"Found {len(experiments)} experiments in remote repo")
+```
+
+### Force Refresh Cache
+
+```python
+import dvc.api
+
+# Get latest data, bypassing cache
+experiments = dvc.api.exp_show(force=True)
+
+print(f"Retrieved {len(experiments)} experiments (fresh data)")
+```
+
+### Only Show Dependency Parameters
+
+```python
+import dvc.api
+
+# Show only parameters that are stage dependencies
+experiments = dvc.api.exp_show(param_deps=True)
+
+for exp in experiments:
+    print(f"\nExperiment: {exp['Experiment']}")
+    # Only dependency params will be included
+    for key, value in exp.items():
+        if key.startswith("params."):
+            print(f"  {key}: {value}")
+```
+
+### Build Leaderboard
+
+```python
+import dvc.api
+from tabulate import tabulate
+
+experiments = dvc.api.exp_show(num=-1)
+
+# Build leaderboard
+leaderboard = []
+for exp in experiments:
+    leaderboard.append({
+        "Experiment": exp.get("Experiment", "baseline"),
+        "Accuracy": exp.get("metrics.accuracy", 0),
+        "F1 Score": exp.get("metrics.f1_score", 0),
+        "Learning Rate": exp.get("params.train.lr", "N/A")
+    })
+
+# Sort by accuracy
+leaderboard.sort(key=lambda x: x["Accuracy"], reverse=True)
+
+print(tabulate(leaderboard, headers="keys", tablefmt="grid"))
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Experiment Tracking" icon="chart-line">
+  Track and analyze all experiments in your project.
+</Card>
+
+<Card title="Model Selection" icon="medal">
+  Find the best performing model based on metrics.
+</Card>
+
+<Card title="Hyperparameter Analysis" icon="sliders">
+  Understand the impact of different parameters.
+</Card>
+
+<Card title="Team Collaboration" icon="users">
+  Share and compare experiments across team members.
+</Card>
+
+</CardGroup>
+
+## Return Value Structure
+
+Each experiment dictionary contains:
+
+<AccordionGroup>
+
+<Accordion title="Experiment metadata">
+  ```python
+  {
+      "Experiment": "exp-random-forest",
+      "rev": "abc123def456",
+      "Created": "2024-03-04 10:30:45",
+      "State": "Success",
+      ...
+  }
+  ```
+</Accordion>
+
+<Accordion title="Metrics (prefixed with 'metrics.')">
+  ```python
+  {
+      "metrics.accuracy": 0.9249,
+      "metrics.precision": 0.9156,
+      "metrics.recall": 0.9342,
+      "metrics.f1_score": 0.9248,
+      ...
+  }
+  ```
+</Accordion>
+
+<Accordion title="Parameters (prefixed with 'params.')">
+  ```python
+  {
+      "params.train.lr": 0.001,
+      "params.train.epochs": 10,
+      "params.train.batch_size": 32,
+      "params.model.hidden_units": 128,
+      ...
+  }
+  ```
+</Accordion>
+
+<Accordion title="Nested parameters">
+  Parameters are flattened with dot notation:
+  
+  ```yaml
+  # params.yaml
+  train:
+    lr: 0.001
+    optimizer:
+      type: adam
+      beta1: 0.9
+  ```
+  
+  ```python
+  # In exp_show() output
+  {
+      "params.train.lr": 0.001,
+      "params.train.optimizer.type": "adam",
+      "params.train.optimizer.beta1": 0.9
+  }
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Use for model selection">
+  Systematically find the best model:
+  
+  ```python
+  import dvc.api
+  
+  experiments = dvc.api.exp_show(num=-1)
+  
+  # Multi-criteria selection
+  candidates = [
+      exp for exp in experiments
+      if exp.get("metrics.accuracy", 0) > 0.90
+      and exp.get("metrics.training_time", float('inf')) < 300
+  ]
+  
+  best = max(candidates, key=lambda x: x["metrics.f1_score"])
+  print(f"Selected: {best['Experiment']}")
+  ```
+</Accordion>
+
+<Accordion title="Track experiment progress">
+  Monitor running experiments:
+  
+  ```python
+  import dvc.api
+  import time
+  
+  while True:
+      experiments = dvc.api.exp_show(force=True)
+      
+      running = [e for e in experiments if e.get("State") == "Running"]
+      queued = [e for e in experiments if e.get("State") == "Queued"]
+      
+      print(f"Running: {len(running)}, Queued: {len(queued)}")
+      
+      if not running and not queued:
+          break
+      
+      time.sleep(60)  # Check every minute
+  ```
+</Accordion>
+
+<Accordion title="Compare against baseline">
+  Always maintain and compare against a baseline:
+  
+  ```python
+  import dvc.api
+  
+  experiments = dvc.api.exp_show()
+  
+  # Find baseline (usually the commit without experiment name)
+  baseline = next((e for e in experiments if not e.get("Experiment")), None)
+  
+  if baseline:
+      for exp in experiments:
+          if exp.get("Experiment"):
+              acc_diff = exp.get("metrics.accuracy", 0) - baseline.get("metrics.accuracy", 0)
+              print(f"{exp['Experiment']}: {acc_diff:+.4f} vs baseline")
+  ```
+</Accordion>
+
+<Accordion title="Handle missing values">
+  Experiments may have different metrics/parameters:
+  
+  ```python
+  import dvc.api
+  
+  experiments = dvc.api.exp_show()
+  
+  for exp in experiments:
+      # Safe access with .get()
+      accuracy = exp.get("metrics.accuracy")
+      if accuracy is not None:
+          print(f"{exp.get('Experiment', 'baseline')}: {accuracy:.4f}")
+      else:
+          print(f"{exp.get('Experiment', 'baseline')}: No accuracy metric")
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Integration Examples
+
+### Streamlit Dashboard
+
+```python
+import dvc.api
+import streamlit as st
+import pandas as pd
+
+st.title("DVC Experiments Dashboard")
+
+# Load experiments
+experiments = dvc.api.exp_show(num=-1)
+
+# Convert to DataFrame
+df = pd.DataFrame(experiments)
+
+# Display metrics
+st.dataframe(df)
+
+# Plot accuracy over time
+if "metrics.accuracy" in df.columns:
+    st.line_chart(df["metrics.accuracy"])
+```
+
+### MLflow Integration
+
+```python
+import dvc.api
+import mlflow
+
+experiments = dvc.api.exp_show()
+
+for exp in experiments:
+    with mlflow.start_run(run_name=exp.get("Experiment")):
+        # Log metrics
+        for key, value in exp.items():
+            if key.startswith("metrics.") and isinstance(value, (int, float)):
+                mlflow.log_metric(key.replace("metrics.", ""), value)
+        
+        # Log parameters
+        for key, value in exp.items():
+            if key.startswith("params."):
+                mlflow.log_param(key.replace("params.", ""), value)
+```
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="params_show()" icon="sliders" href="/api/params_show">
+  Show parameters only
+</Card>
+
+<Card title="metrics_show()" icon="chart-line" href="/api/metrics_show">
+  Show metrics only
+</Card>
+
+<Card title="exp_save()" icon="floppy-disk" href="https://dvc.org/doc/command-reference/exp/save">
+  Create new experiments
+</Card>
+
+</CardGroup>

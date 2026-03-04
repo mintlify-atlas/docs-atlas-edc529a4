@@ -1,0 +1,439 @@
+---
+title: Pipelines
+description: Understand how DVC pipelines define reproducible data processing workflows
+---
+
+## What are Pipelines?
+
+Pipelines in DVC are directed acyclic graphs (DAGs) of data processing stages. Each stage represents a command that transforms inputs into outputs, with dependencies automatically tracked. Pipelines enable reproducible, automated workflows from raw data to final results.
+
+<Info>
+**Key Concept**: Pipelines are defined in `dvc.yaml` files, with stages connected through dependencies. DVC automatically determines execution order and only runs stages when their dependencies change.
+</Info>
+
+## Why Pipelines Matter
+
+- **Reproducibility**: Codify the entire workflow from raw data to results
+- **Automation**: Run only what changed with `dvc repro`
+- **Visibility**: Visualize and understand complex workflows with `dvc dag`
+- **Collaboration**: Share workflows as code, not documentation
+- **Version control**: Track how processing logic evolves alongside data
+
+## Pipeline Structure
+
+Pipelines are defined in `dvc.yaml` files. Here's a typical machine learning pipeline:
+
+```yaml
+stages:
+  prepare:
+    cmd: python prepare.py
+    deps:
+      - data/raw.csv
+      - prepare.py
+    outs:
+      - data/prepared.csv
+  
+  train:
+    cmd: python train.py
+    deps:
+      - data/prepared.csv
+      - train.py
+    params:
+      - train.learning_rate
+      - train.epochs
+    outs:
+      - model.pkl
+    metrics:
+      - metrics.json:
+          cache: false
+```
+
+## Stage Anatomy
+
+Each stage in `dvc.yaml` has several components, implemented in `dvc/stage/__init__.py`:
+
+### Command (cmd)
+
+The command to execute. Can be any shell command:
+
+```yaml
+cmd: python train.py --epochs 10
+```
+
+From `dvc/stage/__init__.py:130-154`:
+```python
+class Stage(params.StageParams):
+    def __init__(
+        self,
+        repo,
+        path=None,
+        cmd=None,  # The command to run
+        wdir=os.curdir,
+        deps=None,
+        outs=None,
+        # ...
+    ):
+        self.cmd = cmd
+        self.wdir = wdir  # Working directory
+        self.outs: list[Output] = outs
+        self.deps: list[Dependency] = deps
+```
+
+### Dependencies (deps)
+
+Files or directories the stage needs. If any dependency changes, the stage is considered outdated:
+
+```yaml
+deps:
+  - data/input.csv
+  - src/process.py
+  - config.json
+```
+
+Dependencies can also be:
+- **Remote files**: URLs or cloud storage paths
+- **Outputs from other stages**: Automatic pipeline chaining
+- **External repo files**: From other DVC/Git repositories
+
+### Parameters (params)
+
+Values from parameter files (like `params.yaml`) used as dependencies:
+
+```yaml
+params:
+  - train.learning_rate
+  - train.batch_size
+  - model.architecture
+```
+
+Parameter dependencies are special - from `dvc/stage/__init__.py:197-200`:
+```python
+@property
+def params(self) -> list["ParamsDependency"]:
+    from dvc.dependency import ParamsDependency
+    return [dep for dep in self.deps if isinstance(dep, ParamsDependency)]
+```
+
+### Outputs (outs)
+
+Files or directories the stage produces. Automatically tracked with DVC:
+
+```yaml
+outs:
+  - data/processed.csv
+  - models/
+```
+
+### Metrics
+
+Numerical outputs for comparing experiments:
+
+```yaml
+metrics:
+  - metrics.json:
+      cache: false
+```
+
+<Note>
+Metrics typically have `cache: false` since they're small text files that change frequently.
+</Note>
+
+### Plots
+
+Data files for visualization:
+
+```yaml
+plots:
+  - plots/training.csv:
+      x: epoch
+      y: loss
+  - plots/confusion_matrix.json:
+      template: confusion
+```
+
+## Pipeline Execution Flow
+
+When you run `dvc repro`, DVC follows this process:
+
+### 1. Dependency Resolution
+
+DVC builds a dependency graph by analyzing all stages. From `dvc/stage/utils.py`, the system checks for circular dependencies:
+
+```python
+def check_circular_dependency(stage):
+    """Check if stage has circular dependencies."""
+    from dvc.exceptions import CyclicGraphError
+    # Implementation ensures DAG structure
+```
+
+### 2. Stage Status Check
+
+For each stage, DVC checks if it needs to run. A stage is outdated if:
+
+- Any dependency has changed (checksum differs)
+- Any parameter has changed
+- The command has changed
+- Outputs are missing
+- Stage is marked as `always_changed`
+
+<Accordion title="Stage Change Detection Logic">
+From `dvc/stage/__init__.py:239-263`:
+
+```python
+@property
+def is_data_source(self) -> bool:
+    """Whether the DVC file was created with `dvc add` or `dvc import`"""
+    return self.cmd is None
+
+@property
+def is_callback(self) -> bool:
+    """
+    A callback stage is always considered as changed,
+    so it runs on every `dvc repro` call.
+    """
+    return self.cmd and not any((self.deps, self.outs))
+```
+
+Callback stages (commands with no dependencies or outputs) always run - useful for notifications or logging.
+</Accordion>
+
+### 3. Execution Order
+
+Stages run in topological order based on dependencies. If stage B depends on stage A's output, A runs first:
+
+```yaml
+stages:
+  stage_a:
+    cmd: python a.py
+    outs:
+      - a.txt
+  
+  stage_b:
+    cmd: python b.py
+    deps:
+      - a.txt  # Depends on stage_a's output
+    outs:
+      - b.txt
+```
+
+Execution order: `stage_a` → `stage_b`
+
+### 4. Stage Execution
+
+When a stage runs, DVC:
+
+1. Changes to the stage's working directory
+2. Executes the command
+3. Hashes all outputs and updates the lockfile
+4. Caches outputs (unless `cache: false`)
+
+From `dvc/stage/run.py:run_stage`:
+```python
+def run_stage(stage, **kwargs):
+    """Run a stage command and capture outputs."""
+    # Execute command in subprocess
+    # Hash and cache outputs
+    # Update dvc.lock
+```
+
+## The Lockfile (dvc.lock)
+
+After running, DVC generates `dvc.lock` with exact versions of all dependencies and outputs:
+
+```yaml
+schema: '2.0'
+stages:
+  train:
+    cmd: python train.py
+    deps:
+    - path: data/prepared.csv
+      md5: a1b2c3d4e5f6
+      size: 1048576
+    - path: train.py
+      md5: 1a2b3c4d5e6f
+      size: 4096
+    params:
+      params.yaml:
+        train.learning_rate: 0.001
+        train.epochs: 10
+    outs:
+    - path: model.pkl
+      md5: 9z8y7x6w5v4u
+      size: 2097152
+```
+
+The lockfile is implemented in `dvc/dvcfile.py:394-476`. It serves as:
+
+- **Version snapshot**: Records exact state of all inputs/outputs
+- **Reproducibility guarantee**: Ensures same inputs produce same outputs
+- **Change detection**: DVC compares current state to lockfile
+
+<Warning>
+**Best Practice**: Commit `dvc.lock` to Git. It enables reproducibility and prevents unnecessary re-runs.
+</Warning>
+
+## Pipeline Features
+
+### Frozen Stages
+
+Prevent stages from running even if outdated:
+
+```yaml
+stages:
+  expensive_stage:
+    frozen: true
+    cmd: python expensive_process.py
+    deps:
+      - huge_dataset/
+    outs:
+      - results/
+```
+
+### Stage Descriptions
+
+Document what each stage does:
+
+```yaml
+stages:
+  train:
+    desc: |
+      Train the neural network model using prepared data.
+      Uses hyperparameters from params.yaml.
+    cmd: python train.py
+```
+
+### Working Directory
+
+Run commands from specific directories:
+
+```yaml
+stages:
+  preprocess:
+    wdir: src/preprocessing
+    cmd: python clean.py
+    deps:
+      - ../../data/raw.csv
+    outs:
+      - ../../data/clean.csv
+```
+
+## Pipeline Visualization
+
+Visualize your pipeline as an ASCII DAG:
+
+```bash
+dvc dag
+```
+
+```
+         +----------+
+         | data.dvc |
+         +----------+
+              *
+              *
+              *
+         +---------+
+         | prepare |
+         +---------+
+              *
+              *
+              *
+          +-------+
+          | train |
+          +-------+
+              *
+              *
+              *
+        +----------+
+        | evaluate |
+        +----------+
+```
+
+The DAG implementation uses `dvc/dagascii.py` to render the graph.
+
+## Multiple Pipelines
+
+You can have multiple `dvc.yaml` files in different directories:
+
+```
+project/
+├── dvc.yaml              # Main pipeline
+├── data/
+│   └── dvc.yaml          # Data preparation pipeline
+└── models/
+    └── dvc.yaml          # Model training pipeline
+```
+
+Each `dvc.yaml` creates an independent pipeline with its own `dvc.lock`.
+
+## Advanced: Foreach Stages
+
+Run the same stage with different parameters:
+
+```yaml
+stages:
+  train:
+    foreach:
+      - model_a
+      - model_b
+      - model_c
+    do:
+      cmd: python train.py ${item}
+      deps:
+        - train.py
+      outs:
+        - models/${item}.pkl
+```
+
+This creates three stages: `train@model_a`, `train@model_b`, `train@model_c`.
+
+## Templating with Parameters
+
+Reference parameters directly in `dvc.yaml`:
+
+```yaml
+# params.yaml
+model_path: models/model.pkl
+epochs: 50
+
+# dvc.yaml
+stages:
+  train:
+    cmd: python train.py --epochs ${epochs}
+    outs:
+      - ${model_path}
+```
+
+<Tip>
+Templating makes pipelines more flexible and reusable across different configurations.
+</Tip>
+
+## Comparing Pipelines to Scripts
+
+| Aspect | Shell Script | DVC Pipeline |
+|--------|--------------|-------------|
+| **Execution** | Always runs everything | Only runs what changed |
+| **Dependencies** | Manual tracking | Automatic detection |
+| **Reproducibility** | Document-based | Code-based with versions |
+| **Visualization** | None | `dvc dag` |
+| **Parallelization** | Manual | Automatic with `-j` flag |
+
+## Related Commands
+
+- [`dvc repro`](/commands/repro) - Reproduce a pipeline
+- [`dvc dag`](/commands/dag) - Visualize pipeline structure
+- [`dvc stage`](/commands/stage) - Manage pipeline stages
+- [`dvc run`](/commands/run) - Create a new stage
+- [`dvc status`](/commands/status) - Check pipeline status
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Experiments" href="/concepts/experiments" icon="flask">
+    Run pipeline variations with different parameters
+  </Card>
+  
+  <Card title="Data Versioning" href="/concepts/data-versioning" icon="database">
+    Understand how pipeline outputs are tracked
+  </Card>
+</CardGroup>

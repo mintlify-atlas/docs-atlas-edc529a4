@@ -1,0 +1,405 @@
+---
+title: "Building Pipelines"
+description: "Create reproducible data processing and ML pipelines with DVC"
+---
+
+## Overview
+
+Pipelines in DVC define the steps (stages) of your data processing and ML workflows. Each stage specifies its dependencies, command, and outputs, allowing DVC to automatically detect when recomputation is needed.
+
+<Info>
+  DVC pipelines are defined in `dvc.yaml` files and track stage execution in `dvc.lock` files.
+</Info>
+
+## Creating Your First Pipeline
+
+<Steps>
+  <Step title="Add your first stage">
+    Use `dvc stage add` to create a stage in your pipeline:
+
+    ```bash
+    dvc stage add -n prepare \
+      -d data/raw/dataset.csv \
+      -o data/prepared/train.csv \
+      -o data/prepared/test.csv \
+      python scripts/prepare.py
+    ```
+
+    This creates a stage named `prepare` that:
+    - **Depends on** (`-d`): `data/raw/dataset.csv`
+    - **Outputs** (`-o`): `data/prepared/train.csv` and `data/prepared/test.csv`
+    - **Runs**: `python scripts/prepare.py`
+  </Step>
+
+  <Step title="Add dependent stages">
+    Create a stage that depends on previous outputs:
+
+    ```bash
+    dvc stage add -n train \
+      -d scripts/train.py \
+      -d data/prepared/train.csv \
+      -p train.epochs,train.lr \
+      -o models/model.pkl \
+      -m metrics/train.json \
+      python scripts/train.py
+    ```
+
+    This stage:
+    - Depends on the training script and prepared data
+    - Uses parameters (`-p`) from `params.yaml`
+    - Outputs a model file and metrics
+  </Step>
+
+  <Step title="Run your pipeline">
+    Execute the entire pipeline:
+
+    ```bash
+    dvc repro
+    ```
+
+    DVC automatically:
+    - Determines the correct execution order
+    - Skips stages that haven't changed
+    - Runs only what's necessary
+
+    <Tip>
+      Run a specific stage with `dvc repro train` or force re-execution with `dvc repro -f`
+    </Tip>
+  </Step>
+</Steps>
+
+## Understanding dvc.yaml
+
+When you add stages, DVC creates a `dvc.yaml` file:
+
+```yaml dvc.yaml
+stages:
+  prepare:
+    cmd: python scripts/prepare.py
+    deps:
+      - data/raw/dataset.csv
+    outs:
+      - data/prepared/train.csv
+      - data/prepared/test.csv
+
+  train:
+    cmd: python scripts/train.py
+    deps:
+      - scripts/train.py
+      - data/prepared/train.csv
+    params:
+      - train.epochs
+      - train.lr
+    outs:
+      - models/model.pkl
+    metrics:
+      - metrics/train.json:
+          cache: false
+
+  evaluate:
+    cmd: python scripts/evaluate.py
+    deps:
+      - scripts/evaluate.py
+      - data/prepared/test.csv
+      - models/model.pkl
+    metrics:
+      - metrics/test.json:
+          cache: false
+```
+
+## Stage Components
+
+### Dependencies (`-d`, `--deps`)
+
+Files or directories that the stage needs:
+
+```bash
+dvc stage add -n train \
+  -d data/train.csv \
+  -d scripts/train.py \
+  python scripts/train.py
+```
+
+<Info>
+  When a dependency changes, DVC knows the stage needs to be re-run.
+</Info>
+
+### Parameters (`-p`, `--params`)
+
+Values from `params.yaml` that affect stage execution:
+
+```yaml params.yaml
+train:
+  epochs: 10
+  lr: 0.001
+  batch_size: 32
+
+model:
+  layers: [128, 64, 32]
+  dropout: 0.2
+```
+
+```bash
+dvc stage add -n train \
+  -p train.epochs,train.lr,train.batch_size \
+  python scripts/train.py
+```
+
+### Outputs (`-o`, `--outs`)
+
+Files or directories created by the stage:
+
+<Tabs>
+  <Tab title="Cached outputs">
+    ```bash
+    dvc stage add -n train \
+      -o models/model.pkl \
+      python scripts/train.py
+    ```
+    
+    Regular outputs are cached by DVC (recommended for models, data files).
+  </Tab>
+
+  <Tab title="Non-cached outputs">
+    ```bash
+    dvc stage add -n train \
+      -O logs/training.log \
+      python scripts/train.py
+    ```
+    
+    Use `-O` for outputs you don't want cached (logs, temporary files).
+  </Tab>
+
+  <Tab title="Persistent outputs">
+    ```bash
+    dvc stage add -n train \
+      --outs-persist checkpoints/ \
+      python scripts/train.py
+    ```
+    
+    Persistent outputs aren't removed during `dvc repro`.
+  </Tab>
+</Tabs>
+
+### Metrics (`-m`, `--metrics`)
+
+JSON, YAML, or CSV files containing metrics:
+
+```bash
+dvc stage add -n evaluate \
+  -d models/model.pkl \
+  -m metrics/scores.json \
+  python scripts/evaluate.py
+```
+
+<Note>
+  Metrics are special outputs that DVC tracks for comparison. They're not cached by default.
+</Note>
+
+### Plots (`--plots`)
+
+Data files for visualizations:
+
+```bash
+dvc stage add -n evaluate \
+  --plots plots/confusion_matrix.csv \
+  python scripts/evaluate.py
+```
+
+## Advanced Stage Options
+
+### Working Directory (`-w`, `--wdir`)
+
+Run the command in a specific directory:
+
+```bash
+dvc stage add -n train \
+  -w src/models \
+  -d ../../data/train.csv \
+  python train.py
+```
+
+### Always Changed (`--always-changed`)
+
+Force a stage to run every time:
+
+```bash
+dvc stage add -n download \
+  --always-changed \
+  -o data/external/dataset.csv \
+  python scripts/download.py
+```
+
+<Warning>
+  Use `--always-changed` sparingly. It bypasses DVC's caching and dependency tracking.
+</Warning>
+
+### Description (`--desc`)
+
+Add human-readable descriptions to stages:
+
+```bash
+dvc stage add -n train \
+  --desc "Train XGBoost model with hyperparameter tuning" \
+  python scripts/train.py
+```
+
+### Force Overwrite (`-f`, `--force`)
+
+Overwrite an existing stage:
+
+```bash
+dvc stage add -n train -f \
+  -d data/train.csv \
+  python scripts/new_train.py
+```
+
+## Managing Pipelines
+
+<CodeGroup>
+
+```bash Run entire pipeline
+dvc repro
+```
+
+```bash Run specific stage
+dvc repro train
+```
+
+```bash Force re-run
+dvc repro -f
+```
+
+```bash Run downstream stages
+dvc repro --downstream train
+```
+
+```bash List all stages
+dvc stage list
+```
+
+```bash Visualize pipeline
+dvc dag
+```
+
+</CodeGroup>
+
+## Pipeline Visualization
+
+View your pipeline structure:
+
+```bash
+$ dvc dag
+
+         +-------------+
+         | data.dvc    |
+         +-------------+
+                *
+                *
+                *
+          +---------+
+          | prepare |
+          +---------+
+           **        **
+         **            **
+        *                *
++-------+                +----------+
+| train |                | validate |
++-------+                +----------+
+        **            **
+          **        **
+            *      *
+         +----------+
+         | evaluate |
+         +----------+
+```
+
+## Complete Example
+
+Here's a full ML pipeline:
+
+<Steps>
+  <Step title="Data preparation">
+    ```bash
+    dvc stage add -n prepare \
+      -d data/raw/dataset.csv \
+      -d scripts/prepare.py \
+      -o data/prepared/train.csv \
+      -o data/prepared/test.csv \
+      python scripts/prepare.py
+    ```
+  </Step>
+
+  <Step title="Feature engineering">
+    ```bash
+    dvc stage add -n featurize \
+      -d scripts/featurize.py \
+      -d data/prepared/train.csv \
+      -d data/prepared/test.csv \
+      -o data/features/train.pkl \
+      -o data/features/test.pkl \
+      python scripts/featurize.py
+    ```
+  </Step>
+
+  <Step title="Model training">
+    ```bash
+    dvc stage add -n train \
+      -d scripts/train.py \
+      -d data/features/train.pkl \
+      -p train.epochs,train.lr,model \
+      -o models/model.pkl \
+      -m metrics/train.json \
+      python scripts/train.py
+    ```
+  </Step>
+
+  <Step title="Model evaluation">
+    ```bash
+    dvc stage add -n evaluate \
+      -d scripts/evaluate.py \
+      -d data/features/test.pkl \
+      -d models/model.pkl \
+      -m metrics/test.json \
+      --plots plots/roc_curve.csv \
+      --plots plots/confusion_matrix.csv \
+      python scripts/evaluate.py
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Small, focused stages" icon="puzzle-piece">
+  Break pipelines into logical steps. Each stage should do one thing well.
+</Card>
+
+<Card title="Declare all dependencies" icon="link">
+  Include scripts, data files, and config files as dependencies for accurate tracking.
+</Card>
+
+<Card title="Use parameters" icon="sliders">
+  Store hyperparameters in `params.yaml` for easy experimentation.
+</Card>
+
+<Card title="Version control dvc.yaml" icon="git-alt">
+  Commit `dvc.yaml` and `dvc.lock` to Git to share pipelines with your team.
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Running Experiments" icon="flask" href="/guide/running-experiments">
+  Run multiple pipeline variations with different parameters
+</Card>
+
+<Card title="Remote Storage" icon="cloud" href="/guide/remote-storage">
+  Store pipeline outputs and intermediate results remotely
+</Card>
+
+</CardGroup>

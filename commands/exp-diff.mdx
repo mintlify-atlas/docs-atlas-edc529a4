@@ -1,0 +1,365 @@
+---
+title: 'dvc exp diff'
+description: 'Compare metrics and parameters between two experiments'
+---
+
+## Description
+
+Compare the metrics and parameters between two experiments or revisions. This command provides a focused comparison showing what changed between two specific runs, making it easy to understand the impact of parameter changes on model performance.
+
+<Tip>
+Use `dvc exp diff` after running an experiment to quickly see how it compares to your baseline.
+</Tip>
+
+## Usage
+
+```bash
+dvc exp diff [a_rev] [b_rev] [options]
+```
+
+## Arguments
+
+<ParamField path="a_rev" type="string" optional default="HEAD">
+  Old experiment or Git revision to compare. Defaults to HEAD if not specified.
+  
+  Can be:
+  - Experiment name (e.g., `exp-a1b2c`)
+  - Git commit SHA
+  - Git branch name
+  - Git tag
+  
+  ```bash
+  dvc exp diff main
+  dvc exp diff exp-baseline
+  ```
+</ParamField>
+
+<ParamField path="b_rev" type="string" optional default="workspace">
+  New experiment or Git revision to compare. Defaults to the current workspace.
+  
+  ```bash
+  dvc exp diff main feature-branch
+  dvc exp diff exp-a1b2c exp-d3e4f
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--all" type="boolean" default="false">
+  Show unchanged metrics and parameters as well. By default, only changed values are displayed.
+  
+  ```bash
+  dvc exp diff --all
+  ```
+</ParamField>
+
+<ParamField path="--param-deps" type="boolean" default="false">
+  Show only parameters that are stage dependencies (defined in `dvc.yaml`).
+  
+  ```bash
+  dvc exp diff --param-deps
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Show output in JSON format for programmatic processing.
+  
+  ```bash
+  dvc exp diff --json > diff.json
+  ```
+</ParamField>
+
+<ParamField path="--md, --markdown" type="boolean" default="false">
+  Show output in Markdown table format (GitHub Flavored Markdown).
+  
+  ```bash
+  dvc exp diff --md
+  ```
+</ParamField>
+
+<ParamField path="--no-path" type="boolean" default="false">
+  Don't show the metric/parameter file path in output.
+  
+  ```bash
+  dvc exp diff --no-path
+  ```
+</ParamField>
+
+<ParamField path="--precision" type="integer" default="5">
+  Round metrics to N digits after the decimal point.
+  
+  ```bash
+  dvc exp diff --precision 3
+  ```
+</ParamField>
+
+## Examples
+
+### Compare workspace with HEAD
+
+```bash
+dvc exp diff
+```
+
+Output:
+```bash
+Metric
+──────────────────────────────────────────────────
+    Path          Metric      HEAD     workspace   diff
+──────────────────────────────────────────────────
+    metrics.json  accuracy    0.89     0.92        +0.03
+    metrics.json  loss        0.287    0.234       -0.053
+
+Param
+──────────────────────────────────────────────────
+    Path          Param            HEAD    workspace
+──────────────────────────────────────────────────
+    params.yaml   train.lr         0.01    0.001
+    params.yaml   train.epochs     50      80
+```
+
+<Info>
+Positive diff values indicate improvement in metrics (when higher is better).
+</Info>
+
+### Compare two specific experiments
+
+```bash
+dvc exp diff exp-baseline exp-new-model
+```
+
+Output:
+```bash
+Metric
+────────────────────────────────────────────────────────────────
+    Path          Metric      exp-baseline  exp-new-model  diff
+────────────────────────────────────────────────────────────────
+    metrics.json  accuracy    0.85          0.92           +0.07
+    metrics.json  f1_score    0.83          0.90           +0.07
+    metrics.json  loss        0.312         0.234          -0.078
+
+Param
+────────────────────────────────────────────────────────────────
+    Path          Param               exp-baseline  exp-new-model
+────────────────────────────────────────────────────────────────
+    params.yaml   model.architecture  resnet18      resnet50
+    params.yaml   train.lr            0.1           0.001
+    params.yaml   train.batch_size    32            64
+```
+
+<Tip>
+Experiment names support tab completion for easier command-line usage.
+</Tip>
+
+### Show all metrics including unchanged
+
+```bash
+dvc exp diff --all
+```
+
+Output:
+```bash
+Metric
+──────────────────────────────────────────────────
+    Path          Metric      HEAD     workspace   diff
+──────────────────────────────────────────────────
+    metrics.json  accuracy    0.89     0.92        +0.03
+    metrics.json  loss        0.287    0.234       -0.053
+    metrics.json  val_loss    0.312    0.312       0
+
+Param
+──────────────────────────────────────────────────
+    Path          Param            HEAD    workspace
+──────────────────────────────────────────────────
+    params.yaml   train.lr         0.01    0.001
+    params.yaml   train.epochs     50      80
+    params.yaml   model.dropout    0.5     0.5
+    params.yaml   random_seed      42      42
+```
+
+<Note>
+Unchanged values have a diff of 0 or show the same value in both columns.
+</Note>
+
+### Hide file paths
+
+```bash
+dvc exp diff --no-path
+```
+
+Output:
+```bash
+Metric
+────────────────────────────────────────
+    Metric      HEAD     workspace   diff
+────────────────────────────────────────
+    accuracy    0.89     0.92        +0.03
+    loss        0.287    0.234       -0.053
+
+Param
+────────────────────────────────────────
+    Param            HEAD    workspace
+────────────────────────────────────────
+    train.lr         0.01    0.001
+    train.epochs     50      80
+```
+
+### Export to JSON
+
+```bash
+dvc exp diff --json
+```
+
+Output:
+```json
+{
+  "metrics": {
+    "metrics.json": {
+      "accuracy": {
+        "old": 0.89,
+        "new": 0.92,
+        "diff": 0.03
+      },
+      "loss": {
+        "old": 0.287,
+        "new": 0.234,
+        "diff": -0.053
+      }
+    }
+  },
+  "params": {
+    "params.yaml": {
+      "train.lr": {
+        "old": 0.01,
+        "new": 0.001
+      },
+      "train.epochs": {
+        "old": 50,
+        "new": 80
+      }
+    }
+  }
+}
+```
+
+<Info>
+JSON format is perfect for integrating with CI/CD pipelines or custom analysis scripts.
+</Info>
+
+### Format as Markdown table
+
+```bash
+dvc exp diff --md
+```
+
+Output:
+```markdown
+## Metric
+
+| Path         | Metric   | HEAD  | workspace | diff   |
+|--------------|----------|-------|-----------|--------|
+| metrics.json | accuracy | 0.89  | 0.92      | +0.03  |
+| metrics.json | loss     | 0.287 | 0.234     | -0.053 |
+
+## Param
+
+| Path        | Param        | HEAD | workspace |
+|-------------|--------------|------|----------|
+| params.yaml | train.lr     | 0.01 | 0.001    |
+| params.yaml | train.epochs | 50   | 80       |
+```
+
+### Compare with custom precision
+
+```bash
+dvc exp diff --precision 2
+```
+
+Output:
+```bash
+Metric
+──────────────────────────────────────────────────
+    Path          Metric      HEAD     workspace   diff
+──────────────────────────────────────────────────
+    metrics.json  accuracy    0.89     0.92        +0.03
+    metrics.json  loss        0.29     0.23        -0.05
+```
+
+### Compare branches
+
+```bash
+dvc exp diff main feature-branch
+```
+
+<Warning>
+Both revisions must exist in your Git history or be valid experiment names.
+</Warning>
+
+## Understanding the Output
+
+### Metrics Table
+
+The metrics table shows:
+- **Path**: File containing the metric (e.g., `metrics.json`)
+- **Metric**: Metric name within the file
+- **Old value**: Metric value in first revision
+- **New value**: Metric value in second revision  
+- **Diff**: Numerical difference (new - old)
+
+### Parameters Table
+
+The parameters table shows:
+- **Path**: File containing the parameter (e.g., `params.yaml`)
+- **Param**: Parameter name within the file
+- **Old value**: Parameter value in first revision
+- **New value**: Parameter value in second revision
+
+<Note>
+Parameters don't show a diff because they're often non-numeric values.
+</Note>
+
+## Common Workflows
+
+### Quick experiment validation
+
+```bash
+# Run experiment with new parameters
+dvc exp run -S train.lr=0.001
+
+# Compare with baseline
+dvc exp diff
+```
+
+### A/B testing
+
+```bash
+# Compare two competing approaches
+dvc exp diff exp-approach-a exp-approach-b --md > comparison.md
+```
+
+### CI/CD integration
+
+```bash
+# Export diff as JSON for automated checks
+dvc exp diff --json > diff.json
+
+# Check if accuracy improved
+accuracy_diff=$(jq '.metrics."metrics.json".accuracy.diff' diff.json)
+if (( $(echo "$accuracy_diff > 0" | bc -l) )); then
+  echo "Accuracy improved!"
+fi
+```
+
+### Documentation generation
+
+```bash
+# Generate markdown report of improvements
+dvc exp diff v1.0 v2.0 --md --all > CHANGELOG_metrics.md
+```
+
+## Related Commands
+
+- `dvc exp show` - View all experiments in a table
+- `dvc exp run` - Create new experiments to compare
+- `dvc metrics diff` - Compare metrics without experiment context
+- `dvc params diff` - Compare parameters without experiment context

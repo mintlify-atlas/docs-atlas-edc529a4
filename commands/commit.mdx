@@ -1,0 +1,257 @@
+---
+title: dvc commit
+description: Record changes to files or directories tracked by DVC
+---
+
+## Synopsis
+
+```bash
+dvc commit [options] [<targets>...]
+```
+
+## Description
+
+The `dvc commit` command records changes to files or directories tracked by DVC by storing the current versions in the cache. It updates the hash values in `.dvc` files or `dvc.lock` to match the current workspace state.
+
+Use `dvc commit` when:
+
+- You've modified tracked data files and want to save the new version
+- You used `dvc add --no-commit` and now want to commit the data to cache
+- You've updated outputs of a DVC pipeline stage and want to persist them
+- You need to update `.dvc` file metadata to reflect current file state
+
+The commit operation:
+
+1. Computes hashes of the current workspace files
+2. Moves/copies the files into the DVC cache
+3. Updates `.dvc` or `dvc.lock` files with new hash values
+4. Creates links from cache back to workspace
+
+<Note>
+Unlike Git's commit, `dvc commit` doesn't create a new version history entry. It updates the current tracking state. Version history is maintained through Git commits of the `.dvc` files.
+</Note>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names. If not specified, commits all changed tracked data.
+  
+  ```bash
+  dvc commit data/raw.csv models/
+  ```
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Commit data even if hash values for dependencies or outputs did not change. Forces a recommit of the data.
+  
+  ```bash
+  dvc commit --force train.dvc
+  ```
+  
+  <Tip>
+  Use this when you want to ensure data is in cache even if DVC thinks nothing changed.
+  </Tip>
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Commit all dependencies of the specified target. Useful for pipeline stages that depend on other stages.
+  
+  ```bash
+  dvc commit --with-deps evaluate.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Commit cache for subdirectories of the specified directory.
+  
+  ```bash
+  dvc commit --recursive data/
+  ```
+</ParamField>
+
+<ParamField path="--no-relink" type="boolean" default="false">
+  Don't recreate links from cache to workspace after committing.
+  
+  <Info>
+  By default, after committing files to cache, DVC recreates the workspace files as links to the cache to save space.
+  </Info>
+</ParamField>
+
+## Examples
+
+### Basic commit
+
+Commit all modified tracked files:
+
+```bash
+dvc commit
+```
+
+```terminal
+Committing data/train.csv
+Committing models/model.pkl
+```
+
+### Commit specific files
+
+Commit only specific targets:
+
+```bash
+dvc commit data/processed.csv
+```
+
+### Commit after modifying data
+
+Typical workflow when updating tracked data:
+
+```bash
+# Modify your data file
+echo "new data" >> data/dataset.csv
+
+# Commit the changes to DVC
+dvc commit data/dataset.csv.dvc
+
+# The .dvc file now has updated hashes
+git add data/dataset.csv.dvc
+git commit -m "Update dataset"
+```
+
+### Commit after add --no-commit
+
+When you used `--no-commit` during add:
+
+```bash
+# Add file without caching
+dvc add --no-commit large-file.bin
+
+# Later, commit it to cache
+dvc commit large-file.bin.dvc
+```
+
+### Force commit
+
+Force a commit even when DVC thinks nothing changed:
+
+```bash
+dvc commit --force data/dataset.csv.dvc
+```
+
+<Warning>
+This will recompute hashes and move data to cache even if the file appears unchanged.
+</Warning>
+
+### Commit pipeline outputs
+
+Commit outputs from a DVC pipeline stage:
+
+```bash
+# After running a pipeline manually or with modified code
+dvc commit train.dvc
+```
+
+### Recursive commit
+
+Commit all `.dvc` files in a directory:
+
+```bash
+dvc commit --recursive experiments/
+```
+
+## Example workflows
+
+### Workflow 1: Update tracked data
+
+```bash
+# 1. Modify your data
+python process_data.py  # Updates data/processed.csv
+
+# 2. Commit changes to DVC
+dvc commit data/processed.csv.dvc
+
+# 3. Commit the updated .dvc file to Git
+git add data/processed.csv.dvc
+git commit -m "Update processed data with new logic"
+
+# 4. Push both Git and DVC changes
+git push
+dvc push
+```
+
+### Workflow 2: Pipeline development
+
+```bash
+# 1. Modify your training script
+vim train.py
+
+# 2. Run the modified pipeline
+dvc repro
+
+# 3. If you modified outputs manually after repro
+dvc commit train.dvc
+
+# 4. Commit to Git
+git add train.dvc dvc.lock
+git commit -m "Update training pipeline"
+```
+
+### Workflow 3: Batch operations
+
+```bash
+# Process multiple files
+python batch_process.py  # Modifies multiple tracked files
+
+# Commit all changes
+dvc commit
+
+# Review what changed
+git diff *.dvc
+
+# Commit to Git
+git add *.dvc
+git commit -m "Batch update all datasets"
+```
+
+## Understanding the difference from Git
+
+| Operation | Git Commit | DVC Commit |
+|-----------|-----------|------------|
+| **What it does** | Creates a new commit in Git history | Updates hash in `.dvc` files and moves data to cache |
+| **Version control** | Yes, creates history entry | No, just updates current state |
+| **What's tracked** | Text files, code, `.dvc` files | Large data files, models, datasets |
+| **Where data goes** | Git repository | DVC cache (local or remote) |
+
+<Info>
+**Best practice**: After `dvc commit`, always `git commit` the updated `.dvc` files to create a version history entry.
+</Info>
+
+## Handling changes
+
+When you commit, DVC may prompt you to confirm changes:
+
+```terminal
+dependencies ['data/raw.csv'] and outputs ['data/processed.csv'] of train.dvc changed. 
+Are you sure you want to commit it? [y/n]
+```
+
+To skip the prompt, use `--force`:
+
+```bash
+dvc commit --force
+```
+
+## Performance considerations
+
+<Tip>
+**Commit specific targets** - Instead of committing everything with `dvc commit`, specify targets to avoid unnecessary hash computations for unchanged files.
+</Tip>
+
+<Tip>
+**Use --no-relink for speed** - If you don't need workspace files updated, use `--no-relink` to skip the relinking step.
+</Tip>
+
+## Related commands
+
+- `dvc add` - Start tracking new files
+- `dvc checkout` - Update workspace from cache
+- `dvc push` - Upload committed data to remote storage
+- `dvc status` - Check which files have changed

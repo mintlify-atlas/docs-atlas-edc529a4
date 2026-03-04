@@ -1,97 +1,305 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: DVC Documentation
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#ed6334] via-[#8355c6] to-[#14a6c1] dark:from-[#ed6334] dark:via-[#8355c6] dark:to-[#14a6c1]">
+  <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+  <div className="relative max-w-7xl mx-auto px-6 sm:px-8 py-20 sm:py-24">
+    <div className="text-center">
+      <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+        Data Version Control for Machine Learning
+      </h1>
+      <p className="text-lg sm:text-xl text-white/90 max-w-3xl mx-auto mb-8">
+        Version your data and models, build reproducible ML pipelines, and track experiments — all with Git-like commands you already know.
+      </p>
+      <div className="flex flex-wrap gap-4 justify-center">
+        <a
+          href="/quickstart"
+          className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#ed6334] font-semibold hover:bg-white/90 transition-colors no-underline"
+        >
+          Get Started
+        </a>
+        <a
+          href="/commands/overview"
+          className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors no-underline"
+        >
+          Command Reference
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get up and running with DVC in minutes
+  </p>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Install DVC">
+      Install DVC using your preferred package manager:
 
-## Make it yours
+      ```bash pip
+      pip install dvc
+      ```
 
-Design a docs site that looks great and empowers your users.
+      ```bash brew
+      brew install dvc
+      ```
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
+      ```bash conda
+      conda install -c conda-forge dvc
+      ```
+    </Step>
+
+    <Step title="Initialize a DVC repository">
+      Navigate to your Git repository and initialize DVC:
+
+      ```bash
+      cd your-ml-project
+      git init
+      dvc init
+      git commit -m "Initialize DVC"
+      ```
+
+      This creates a `.dvc` directory with DVC configuration files.
+    </Step>
+
+    <Step title="Track your first data file">
+      Start versioning your data with DVC:
+
+      ```bash
+      dvc add data/dataset.csv
+      git add data/dataset.csv.dvc data/.gitignore
+      git commit -m "Add dataset to DVC"
+      ```
+
+      DVC creates a `.dvc` file that tracks your data, while the actual data is stored in the DVC cache.
+    </Step>
+
+    <Step title="Set up remote storage">
+      Configure remote storage to share data with your team:
+
+      ```bash
+      dvc remote add -d myremote s3://mybucket/dvcstore
+      dvc push
+      ```
+
+      Now your data is backed up and can be accessed by anyone on your team.
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Explore by topic
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Learn about DVC's core features and capabilities
+  </p>
+
+  <CardGroup cols={2}>
     <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      title="Data versioning"
+      icon="database"
+      href="/concepts/data-versioning"
+    >
+      Store and version your datasets and models alongside your Git repository
+    </Card>
+    <Card
+      title="ML pipelines"
+      icon="diagram-project"
+      href="/concepts/pipelines"
+    >
+      Build reproducible workflows that connect data, code, and models
+    </Card>
+    <Card
+      title="Experiment tracking"
+      icon="flask"
+      href="/concepts/experiments"
+    >
+      Run, compare, and manage hundreds of ML experiments locally
+    </Card>
+    <Card
+      title="Remote storage"
+      icon="cloud"
+      href="/concepts/remote-storage"
+    >
+      Back up data to S3, GCS, Azure, SSH, and more cloud providers
+    </Card>
+  </CardGroup>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    User guides
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Practical guides for common DVC workflows
+  </p>
 
-Everything you need to create world-class documentation.
+  <CardGroup cols={3}>
+    <Card
+      title="Track data"
+      icon="folder-open"
+      href="/guide/tracking-data"
+    >
+      Learn how to version datasets and models with DVC
+    </Card>
+    <Card
+      title="Build pipelines"
+      icon="sitemap"
+      href="/guide/building-pipelines"
+    >
+      Create reproducible ML pipelines with stages
+    </Card>
+    <Card
+      title="Run experiments"
+      icon="lightbulb"
+      href="/guide/running-experiments"
+    >
+      Track hyperparameters and compare experiment results
+    </Card>
+    <Card
+      title="Remote storage"
+      icon="server"
+      href="/guide/remote-storage"
+    >
+      Set up cloud storage for data and model sharing
+    </Card>
+    <Card
+      title="Collaboration"
+      icon="users"
+      href="/guide/collaboration"
+    >
+      Work with your team using Git and DVC together
+    </Card>
+    <Card
+      title="Python API"
+      icon="code"
+      href="/api/overview"
+    >
+      Access DVC functionality programmatically
+    </Card>
+  </CardGroup>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Command reference
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Complete reference for all DVC commands
+  </p>
 
-## Need inspiration?
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a
+      href="/commands/add"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#ed6334] dark:hover:border-[#ed6334] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#ed6334] transition-colors">
+          Data management
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Commands for tracking, pushing, pulling, and managing data files
+        </p>
+        <div className="flex items-center text-sm text-[#ed6334] font-medium">
+          <span>Explore commands</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    <a
+      href="/commands/stage"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#ed6334] dark:hover:border-[#ed6334] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#ed6334] transition-colors">
+          Pipeline commands
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Build and run reproducible ML pipelines and workflows
+        </p>
+        <div className="flex items-center text-sm text-[#ed6334] font-medium">
+          <span>Explore commands</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/commands/exp-run"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#ed6334] dark:hover:border-[#ed6334] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#ed6334] transition-colors">
+          Experiment commands
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Track, compare, and manage ML experiments locally
+        </p>
+        <div className="flex items-center text-sm text-[#ed6334] font-medium">
+          <span>Explore commands</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/commands/metrics"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#ed6334] dark:hover:border-[#ed6334] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#ed6334] transition-colors">
+          Metrics & parameters
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Track and compare hyperparameters, metrics, and plots
+        </p>
+        <div className="flex items-center text-sm text-[#ed6334] font-medium">
+          <span>Explore commands</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border border-gray-200 dark:border-[#27272a] bg-gradient-to-br from-gray-50 to-white dark:from-[#1a1d27] dark:to-[#242838] p-8 sm:p-12">
+    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Ready to get started?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-2xl">
+      Start versioning your data and models, building reproducible ML pipelines, and tracking experiments with DVC today.
+    </p>
+    <div className="flex flex-wrap gap-4">
+      <a
+        href="/installation"
+        className="inline-flex items-center px-6 py-3 rounded-lg bg-[#ed6334] text-white font-semibold hover:bg-[#d95529] transition-colors no-underline"
+      >
+        Install DVC
+      </a>
+      <a
+        href="https://github.com/treeverse/dvc"
+        className="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] text-gray-900 dark:text-white font-semibold hover:bg-gray-50 dark:hover:bg-[#242838] transition-colors no-underline"
+      >
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</div>

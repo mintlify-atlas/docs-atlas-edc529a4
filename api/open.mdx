@@ -1,0 +1,406 @@
+---
+title: 'dvc.api.open()'
+description: 'Open and stream DVC-tracked files with a context manager for memory-efficient data access'
+icon: 'folder-open'
+---
+
+<Note>
+Source: [dvc/api/data.py:102-255](~/workspace/source/dvc/api/data.py)
+</Note>
+
+## Description
+
+Opens a DVC-tracked file and returns a file object for streaming. This function **must** be used as a context manager with the `with` keyword.
+
+Unlike `dvc.api.read()`, this function streams file contents directly from remote storage, allowing you to process data incrementally without loading the entire file into memory.
+
+## Signature
+
+```python
+dvc.api.open(
+    path: str,
+    repo: Optional[str] = None,
+    rev: Optional[str] = None,
+    remote: Optional[str] = None,
+    mode: str = "r",
+    encoding: Optional[str] = None,
+    config: Optional[dict[str, Any]] = None,
+    remote_config: Optional[dict[str, Any]] = None,
+)
+```
+
+## Parameters
+
+<ParamField path="path" type="str" required>
+  Location and filename of the target file, relative to the root of the repository.
+  
+  ```python
+  # Examples
+  path="data/train.csv"
+  path="models/model.pkl"
+  path="features/embeddings.npy"
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC or Git repository. Defaults to the current project (found by walking up from the current working directory).
+  
+  Can be:
+  - A URL to a Git repository
+  - A local file system path
+  - HTTP and SSH protocols are supported
+  
+  ```python
+  # Remote repository
+  repo="https://github.com/iterative/example-get-started"
+  
+  # Private repository via SSH
+  repo="git@github.com:user/private-repo.git"
+  
+  # Local repository
+  repo="/path/to/local/repo"
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Git revision such as a branch name, tag name, commit hash, or DVC experiment name.
+  
+  - Defaults to `HEAD` for Git repositories
+  - For local repositories without `rev`, reads from the working directory
+  - Ignored if `repo` is not a Git repository
+  
+  ```python
+  rev="main"              # Branch
+  rev="v1.0.0"            # Tag
+  rev="abc123"            # Commit hash
+  rev="exp-random-forest" # Experiment name
+  ```
+</ParamField>
+
+<ParamField path="remote" type="str" default="None">
+  Name of the DVC remote to use. Defaults to the repository's default remote.
+  
+  For local projects, the cache is tried before the default remote.
+  
+  ```python
+  remote="myremote"
+  remote="s3-storage"
+  ```
+</ParamField>
+
+<ParamField path="mode" type="str" default="r">
+  Mode in which to open the file. Defaults to `"r"` (read mode).
+  
+  **Only reading modes are supported.**
+  
+  ```python
+  mode="r"   # Read text mode
+  mode="rb"  # Read binary mode
+  ```
+</ParamField>
+
+<ParamField path="encoding" type="str" default="None">
+  Text encoding to use (e.g., `"utf-8"`, `"latin-1"`). Only applicable in text mode.
+  
+  Mirrors the encoding parameter in Python's built-in `open()`.
+  
+  ```python
+  encoding="utf-8"
+  encoding="latin-1"
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  DVC config dictionary to pass to the repository.
+  
+  ```python
+  config={"cache": {"type": "symlink"}}
+  ```
+</ParamField>
+
+<ParamField path="remote_config" type="dict" default="None">
+  Remote configuration dictionary to pass to the repository.
+  
+  ```python
+  remote_config={"url": "s3://mybucket/path"}
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="file_object" type="_OpenContextManager">
+  A context manager that yields a file object. The exact type depends on the mode:
+  
+  - Text mode (`mode="r"`): Returns a text file object
+  - Binary mode (`mode="rb"`): Returns a binary file object
+  
+  The file object supports standard file operations like `read()`, `readline()`, and iteration.
+</ResponseField>
+
+## Raises
+
+<ResponseField name="AttributeError" type="exception">
+  Raised when the function is used without a context manager (without `with` statement).
+</ResponseField>
+
+<ResponseField name="ValueError" type="exception">
+  Raised when a non-read mode is specified (e.g., `mode="w"`).
+</ResponseField>
+
+<ResponseField name="FileMissingError" type="exception">
+  Raised when the specified file does not exist in the repository.
+</ResponseField>
+
+<ResponseField name="OutputNotFoundError" type="exception">
+  Raised when the file is not tracked by DVC.
+</ResponseField>
+
+## Examples
+
+### Basic File Reading
+
+```python
+import dvc.api
+
+with dvc.api.open(
+    'data/train.csv',
+    repo='https://github.com/iterative/example-get-started'
+) as f:
+    data = f.read()
+    print(data)
+```
+
+### Streaming Large Files
+
+```python
+import dvc.api
+
+# Process file line by line without loading entire file
+with dvc.api.open('data/large_dataset.txt') as f:
+    for line in f:
+        process_line(line)
+```
+
+### Using with Pandas
+
+```python
+import dvc.api
+import pandas as pd
+
+with dvc.api.open(
+    'data/features.csv',
+    repo='https://github.com/user/ml-project'
+) as f:
+    df = pd.read_csv(f)
+    print(df.head())
+```
+
+### Binary File (Model Weights)
+
+```python
+import dvc.api
+import pickle
+
+with dvc.api.open(
+    'models/classifier.pkl',
+    mode='rb',
+    rev='v1.0.0'
+) as f:
+    model = pickle.load(f)
+    predictions = model.predict(X_test)
+```
+
+### XML Parsing with SAX
+
+```python
+import dvc.api
+from xml.sax import parse
+
+# Memory-efficient streaming XML parsing
+with dvc.api.open(
+    'data/large_dataset.xml',
+    repo='https://github.com/iterative/dataset-registry'
+) as fd:
+    parse(fd, MySAXHandler())
+```
+
+### Private Repository Access
+
+```python
+import dvc.api
+
+# Access private repo via SSH (requires configured SSH keys)
+with dvc.api.open(
+    'features.dat',
+    repo='git@github.com:company/private-ml-repo.git',
+    rev='production'
+) as f:
+    features = f.read()
+```
+
+### Specific Git Revision
+
+```python
+import dvc.api
+import json
+
+# Read from a specific experiment
+with dvc.api.open(
+    'metrics/results.json',
+    rev='exp-tuned-hyperparams'
+) as f:
+    metrics = json.load(f)
+    print(f"Accuracy: {metrics['accuracy']}")
+```
+
+### Custom Encoding
+
+```python
+import dvc.api
+
+with dvc.api.open(
+    'data/european_text.txt',
+    encoding='latin-1'
+) as f:
+    content = f.read()
+```
+
+### Using Specific Remote
+
+```python
+import dvc.api
+
+# Explicitly specify which remote to use
+with dvc.api.open(
+    'data/dataset.csv',
+    remote='s3-backup',
+    repo='/path/to/local/repo'
+) as f:
+    data = f.read()
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Streaming Large Files" icon="water">
+  Process files larger than available RAM by reading incrementally.
+</Card>
+
+<Card title="Data Pipeline Integration" icon="diagram-project">
+  Load DVC-tracked datasets directly into training or processing pipelines.
+</Card>
+
+<Card title="Version-Specific Data" icon="code-branch">
+  Access different versions of data from various branches or experiments.
+</Card>
+
+<Card title="Remote Data Access" icon="cloud">
+  Stream data directly from cloud storage without local downloads.
+</Card>
+
+</CardGroup>
+
+## Comparison with dvc.api.read()
+
+<Tip>
+Choose `open()` for large files or when you need streaming. Use `read()` for small files when you need the complete content immediately.
+</Tip>
+
+| Feature | `dvc.api.open()` | `dvc.api.read()` |
+|---------|------------------|------------------|
+| **Usage** | Context manager (`with` statement) | Simple function call |
+| **Memory** | Streams data incrementally | Loads entire file |
+| **Best for** | Large files, streaming | Small files, complete reads |
+| **Returns** | File object | File contents (str/bytes) |
+
+```python
+# open() - Memory efficient
+with dvc.api.open('large_file.csv') as f:
+    for line in f:  # Processes line by line
+        process(line)
+
+# read() - Simpler but loads everything
+data = dvc.api.read('large_file.csv')  # Entire file in memory
+for line in data.split('\n'):
+    process(line)
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Always use with statement">
+  The function must be used as a context manager. This ensures proper cleanup:
+  
+  ```python
+  # ✅ Correct
+  with dvc.api.open('data.csv') as f:
+      data = f.read()
+  
+  # ❌ Wrong - Will raise AttributeError
+  f = dvc.api.open('data.csv')
+  data = f.read()
+  ```
+</Accordion>
+
+<Accordion title="Choose appropriate mode">
+  Use text mode for text files and binary mode for binary data:
+  
+  ```python
+  # Text files
+  with dvc.api.open('data.txt', mode='r') as f:
+      text = f.read()
+  
+  # Binary files (models, images, etc.)
+  with dvc.api.open('model.pkl', mode='rb') as f:
+      model = pickle.load(f)
+  ```
+</Accordion>
+
+<Accordion title="Stream large files">
+  For large files, process data incrementally instead of reading everything:
+  
+  ```python
+  # Memory efficient
+  with dvc.api.open('huge_file.txt') as f:
+      for line in f:
+          process(line)  # Only one line in memory at a time
+  ```
+</Accordion>
+
+<Accordion title="Handle exceptions">
+  Wrap API calls in try-except blocks for robust error handling:
+  
+  ```python
+  from dvc.exceptions import FileMissingError, OutputNotFoundError
+  
+  try:
+      with dvc.api.open('data.csv') as f:
+          data = f.read()
+  except OutputNotFoundError:
+      print("File not tracked by DVC")
+  except FileMissingError:
+      print("File not found")
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read complete file contents in one call
+</Card>
+
+<Card title="get_url()" icon="link" href="/api/get_url">
+  Get the remote storage URL
+</Card>
+
+<Card title="DVCFileSystem" icon="folder-tree" href="/api/dvcfilesystem">
+  Low-level file system interface
+</Card>
+
+</CardGroup>

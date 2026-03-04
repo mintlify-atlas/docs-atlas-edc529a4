@@ -1,0 +1,201 @@
+---
+title: dvc run (deprecated)
+description: Legacy command for creating pipeline stages. Use 'dvc stage add' instead.
+---
+
+<Warning>
+  **This command is deprecated.** Use [`dvc stage add`](/commands/stage) instead. All functionality from `dvc run` is available in the new command.
+</Warning>
+
+## Synopsis
+
+```bash
+dvc run [options] command
+```
+
+## Description
+
+The `dvc run` command was used in earlier versions of DVC to create pipeline stages. It has been superseded by the more explicit and feature-rich `dvc stage add` command.
+
+### Why was it deprecated?
+
+- **Clearer semantics**: `dvc stage add` makes it explicit that you're adding a stage to a pipeline
+- **Better subcommand structure**: The `dvc stage` command groups related functionality (add, list, etc.)
+- **Improved consistency**: Aligns with DVC's overall command structure
+- **Same functionality**: All features from `dvc run` are available in `dvc stage add`
+
+## Migration Guide
+
+Migrating from `dvc run` to `dvc stage add` is straightforward - the syntax is almost identical:
+
+### Basic command migration
+
+**Old syntax (dvc run):**
+```bash
+dvc run -n prepare -d data.csv -o prepared.csv python prepare.py
+```
+
+**New syntax (dvc stage add):**
+```bash
+dvc stage add -n prepare -d data.csv -o prepared.csv python prepare.py
+```
+
+<Info>
+  Simply replace `dvc run` with `dvc stage add`. All flags and options remain the same.
+</Info>
+
+### Complete migration examples
+
+#### Example 1: Data preprocessing
+
+**Old:**
+```bash
+dvc run -n preprocess \
+  -d raw/data.csv \
+  -d src/preprocess.py \
+  -o data/processed.csv \
+  python src/preprocess.py
+```
+
+**New:**
+```bash
+dvc stage add -n preprocess \
+  -d raw/data.csv \
+  -d src/preprocess.py \
+  -o data/processed.csv \
+  python src/preprocess.py
+```
+
+#### Example 2: Model training with parameters
+
+**Old:**
+```bash
+dvc run -n train \
+  -d data/processed.csv \
+  -d src/train.py \
+  -p train.epochs,train.lr \
+  -o models/model.pkl \
+  -m metrics.json \
+  python src/train.py
+```
+
+**New:**
+```bash
+dvc stage add -n train \
+  -d data/processed.csv \
+  -d src/train.py \
+  -p train.epochs,train.lr \
+  -o models/model.pkl \
+  -m metrics.json \
+  python src/train.py
+```
+
+#### Example 3: Evaluation with plots
+
+**Old:**
+```bash
+dvc run -n evaluate \
+  -d models/model.pkl \
+  -d data/test.csv \
+  -m scores.json \
+  --plots confusion_matrix.csv \
+  python evaluate.py
+```
+
+**New:**
+```bash
+dvc stage add -n evaluate \
+  -d models/model.pkl \
+  -d data/test.csv \
+  -m scores.json \
+  --plots confusion_matrix.csv \
+  python evaluate.py
+```
+
+## Option Mapping
+
+All options from `dvc run` are supported in `dvc stage add`:
+
+| Flag | Purpose | Status |
+|------|---------|--------|
+| `-n, --name` | Stage name | ✅ Same |
+| `-d, --deps` | Dependencies | ✅ Same |
+| `-o, --outs` | Outputs (cached) | ✅ Same |
+| `-O, --outs-no-cache` | Outputs (not cached) | ✅ Same |
+| `-p, --params` | Parameter dependencies | ✅ Same |
+| `-m, --metrics` | Metrics outputs | ✅ Same |
+| `-M, --metrics-no-cache` | Metrics (not cached) | ✅ Same |
+| `--plots` | Plot outputs | ✅ Same |
+| `--plots-no-cache` | Plots (not cached) | ✅ Same |
+| `-f, --force` | Overwrite existing stage | ✅ Same |
+| `-w, --wdir` | Working directory | ✅ Same |
+| `--always-changed` | Always run stage | ✅ Same |
+| `--desc` | Stage description | ✅ Same |
+
+<Tip>
+  There's no functional difference between the flags - it's a direct one-to-one mapping.
+</Tip>
+
+## Automated Migration
+
+If you have scripts or CI/CD pipelines using `dvc run`, you can quickly migrate them:
+
+### Using find and replace
+
+```bash
+# In your scripts
+sed -i 's/dvc run/dvc stage add/g' *.sh
+```
+
+### Updating Makefiles
+
+**Before:**
+```makefile
+prepare:
+	dvc run -n prepare -d data.csv -o prepared.csv python prepare.py
+```
+
+**After:**
+```makefile
+prepare:
+	dvc stage add -n prepare -d data.csv -o prepared.csv python prepare.py
+```
+
+### Updating CI/CD configurations
+
+**GitHub Actions (before):**
+```yaml
+- name: Create pipeline
+  run: dvc run -n train -d data.csv -o model.pkl python train.py
+```
+
+**GitHub Actions (after):**
+```yaml
+- name: Create pipeline
+  run: dvc stage add -n train -d data.csv -o model.pkl python train.py
+```
+
+## Frequently Asked Questions
+
+### Will my existing pipelines break?
+
+No. The `dvc run` command created stages in `dvc.yaml` files using the same format that `dvc stage add` creates. Your existing pipeline files will continue to work with all DVC commands.
+
+### Do I need to recreate my pipelines?
+
+No. Only the command to *create* stages has changed. Your existing stages in `dvc.yaml` don't need any modifications.
+
+### Is dvc run completely removed?
+
+While deprecated, `dvc run` may still work in some versions for backward compatibility. However, it's recommended to migrate to `dvc stage add` as support will eventually be removed.
+
+### What about dvc.lock files?
+
+The `dvc.lock` file format is unchanged. Both `dvc run` and `dvc stage add` produce identical lock files.
+
+## See Also
+
+- [dvc stage add](/commands/stage) - Create pipeline stages (recommended)
+- [dvc stage list](/commands/stage) - List existing stages
+- [dvc repro](/commands/repro) - Reproduce pipelines
+- [dvc dag](/commands/dag) - Visualize pipeline structure

@@ -1,0 +1,291 @@
+---
+title: 'dvc init'
+description: 'Initialize DVC repository'
+---
+
+## Description
+
+The `dvc init` command initializes a DVC repository in a directory, creating the necessary DVC structure (`.dvc` directory and configuration files). This is typically the first command you run when starting to use DVC in a project.
+
+## Usage
+
+```bash
+dvc init [directory] [options]
+```
+
+<CodeGroup>
+```bash Basic Init
+dvc init
+```
+
+```bash Init in Specific Directory
+dvc init /path/to/project
+```
+
+```bash Init Without Git
+dvc init --no-scm
+```
+
+```bash Force Reinitialize
+dvc init --force
+```
+
+```bash Init in Subdirectory
+dvc init --subdir
+```
+</CodeGroup>
+
+## Arguments
+
+<ParamField path="directory" type="string" optional default=".">
+  Directory to initialize DVC in. Defaults to the current working directory.
+</ParamField>
+
+## Options
+
+<ParamField path="--no-scm" type="flag">
+  Initiate DVC in directory that is not tracked by any SCM tool (e.g. Git).
+  
+  By default, DVC expects to be initialized in a Git repository. Use this flag to use DVC without Git.
+</ParamField>
+
+<ParamField path="-f, --force" type="flag">
+  Overwrite existing `.dvc/` directory. This operation removes local cache.
+  
+  <Warning>
+  Using `--force` will delete your local cache. Make sure you've pushed important data to a remote before using this option.
+  </Warning>
+</ParamField>
+
+<ParamField path="--subdir" type="flag">
+  Necessary for running this command inside a subdirectory of a parent SCM repository.
+  
+  Allows you to initialize a DVC project in a subdirectory of a Git repository (monorepo structure).
+</ParamField>
+
+## Examples
+
+### Initialize in Current Directory
+
+```bash
+# Navigate to your project directory
+cd myproject
+
+# Initialize Git (if not already done)
+git init
+
+# Initialize DVC
+dvc init
+```
+
+```
+Initializing DVC repository...
+
+You can now commit the changes to git.
+
+What's next?
+------------
+- Check out the documentation: https://dvc.org/doc
+- Get help and share ideas: https://dvc.org/chat
+- Star us on GitHub: https://github.com/treeverse/dvc
+```
+
+<Info>
+`dvc init` creates a `.dvc` directory with configuration files and adds them to `.gitignore`.
+</Info>
+
+### Initialize Without Git (Standalone)
+
+```bash
+# Use DVC without Git version control
+dvc init --no-scm
+```
+
+This is useful when:
+- You're using a different version control system
+- You want to use DVC for data management without version control
+- You're in an environment where Git isn't available
+
+### Reinitialize (Force)
+
+```bash
+# Remove existing DVC setup and reinitialize
+dvc init --force
+```
+
+<Warning>
+`--force` will delete your local cache (`.dvc/cache`). Ensure you've run `dvc push` to backup data to a remote before forcing reinitialization.
+</Warning>
+
+### Initialize in Subdirectory (Monorepo)
+
+```bash
+# In a monorepo structure
+cd myrepo/ml-project
+dvc init --subdir
+```
+
+Useful for:
+- Monorepo projects with multiple sub-projects
+- Large repositories where only part needs DVC tracking
+- Separate data management for different components
+
+## What Gets Created
+
+When you run `dvc init`, DVC creates the following structure:
+
+```
+.dvc/
+├── .gitignore          # Prevents tracking cache and temp files
+├── config              # DVC configuration
+└── cache/              # Local cache for tracked files (empty initially)
+```
+
+And adds the following to your `.gitignore`:
+
+```gitignore .gitignore
+/dvc.lock
+```
+
+<Tip>
+The `.dvc/` directory should be committed to Git (except for `cache/` and other ignored items).
+</Tip>
+
+## Post-Initialization Steps
+
+<Steps>
+  <Step title="Commit DVC files">
+    ```bash
+    git add .dvc .gitignore
+    git commit -m "Initialize DVC"
+    ```
+  </Step>
+  
+  <Step title="Configure a remote (optional)">
+    ```bash
+    dvc remote add -d storage s3://mybucket/dvc-storage
+    git add .dvc/config
+    git commit -m "Configure DVC remote"
+    ```
+  </Step>
+  
+  <Step title="Start tracking data">
+    ```bash
+    dvc add data/dataset.csv
+    git add data/dataset.csv.dvc data/.gitignore
+    git commit -m "Track dataset with DVC"
+    ```
+  </Step>
+</Steps>
+
+## Initialization Checks
+
+Before initializing, verify:
+
+<AccordionGroup>
+  <Accordion title="Git is initialized" icon="git">
+    ```bash
+    # Check if Git is initialized
+    git status
+    
+    # Initialize Git if needed
+    git init
+    ```
+    
+    (Skip if using `--no-scm`)
+  </Accordion>
+  
+  <Accordion title="Directory is correct" icon="folder">
+    ```bash
+    # Verify you're in the right directory
+    pwd
+    ```
+  </Accordion>
+  
+  <Accordion title="No existing .dvc directory" icon="circle-exclamation">
+    ```bash
+    # Check for existing DVC initialization
+    ls -la .dvc
+    ```
+    
+    Use `--force` if you need to reinitialize.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="New ML Project" icon="sparkles">
+    Start tracking datasets, models, and experiments from day one.
+  </Card>
+  
+  <Card title="Existing Project" icon="folder-plus">
+    Add data version control to an existing codebase.
+  </Card>
+  
+  <Card title="Monorepo Setup" icon="diagram-project">
+    Use `--subdir` to enable DVC in part of a larger repository.
+  </Card>
+  
+  <Card title="No-Git Workflow" icon="ban">
+    Use `--no-scm` for DVC-only data management without version control.
+  </Card>
+</CardGroup>
+
+## Configuration After Init
+
+After initialization, you may want to configure:
+
+### Cache Location
+
+```bash
+# Use external drive for cache
+dvc cache dir /mnt/external/dvc-cache
+```
+
+### Analytics (Opt-out)
+
+```bash
+# Disable anonymous usage analytics
+dvc config core.analytics false
+```
+
+### Autostage
+
+```bash
+# Automatically stage changes in dvc.lock
+dvc config core.autostage true
+```
+
+## Troubleshooting
+
+### Already Initialized Error
+
+```
+ERROR: '.dvc' directory already exists.
+```
+
+**Solution:** Use `dvc init --force` to reinitialize (note: this removes local cache).
+
+### Not a Git Repository Error
+
+```
+ERROR: Not inside a Git repository.
+```
+
+**Solution:** Either run `git init` first, or use `dvc init --no-scm`.
+
+### Permission Denied
+
+```
+ERROR: Permission denied: '.dvc'
+```
+
+**Solution:** Check directory permissions or run with appropriate privileges.
+
+## Related Commands
+
+- `dvc add` - Start tracking data files with DVC
+- `dvc remote add` - Configure remote storage
+- `dvc config` - Modify DVC configuration
+- `dvc destroy` - Remove DVC from project (opposite of init)

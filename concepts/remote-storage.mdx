@@ -1,0 +1,568 @@
+---
+title: Remote Storage
+description: Learn how DVC uses remote storage to share data and collaborate with teams
+---
+
+## What is Remote Storage?
+
+Remote storage in DVC is where you store the actual data files, models, and artifacts tracked by DVC - separate from Git. While Git repositories contain `.dvc` files (metadata pointers), remote storage holds the real data. This enables teams to share large files without bloating Git repos.
+
+<Info>
+**Key Concept**: Remote storage acts like a centralized cache. Team members push/pull data to/from remotes, similar to how Git push/pull works for code.
+</Info>
+
+## Why Remote Storage Matters
+
+- **Collaboration**: Share datasets and models with your team
+- **Backup**: Protect against data loss with cloud storage
+- **Storage efficiency**: Only download data you need
+- **Version consistency**: Ensure everyone uses the same data versions
+- **Scale**: Store terabytes of data without Git performance issues
+
+## How Remote Storage Works
+
+The remote storage system is implemented in `dvc/data_cloud.py`. When you run commands like `dvc push` or `dvc pull`, DVC transfers data between your local cache and remote storage.
+
+### Architecture Overview
+
+```
+┌─────────────────┐
+│  Your Workspace │  (working files)
+│   data/         │
+└────────┬────────┘
+         │ dvc add/checkout
+         ↓
+┌─────────────────┐
+│  Local Cache    │  (.dvc/cache)
+│  Content-based  │
+│  storage        │
+└────────┬────────┘
+         │ dvc push/pull
+         ↓
+┌─────────────────┐
+│ Remote Storage  │  (S3, GCS, Azure, etc.)
+│  Team's shared  │
+│  cache          │
+└─────────────────┘
+```
+
+## Supported Storage Types
+
+DVC supports many storage backends:
+
+<CardGroup cols={3}>
+  <Card title="Amazon S3" icon="aws">
+    AWS S3 buckets
+  </Card>
+  <Card title="Google Cloud" icon="google">
+    GCS buckets
+  </Card>
+  <Card title="Azure Blob" icon="microsoft">
+    Azure storage
+  </Card>
+  <Card title="SSH/SFTP" icon="server">
+    Remote servers
+  </Card>
+  <Card title="HDFS" icon="database">
+    Hadoop filesystem
+  </Card>
+  <Card title="HTTP/HTTPS" icon="globe">
+    Web servers
+  </Card>
+  <Card title="Local/NFS" icon="folder">
+    Local or network drives
+  </Card>
+  <Card title="WebDAV" icon="cloud">
+    WebDAV servers
+  </Card>
+  <Card title="OSS" icon="cloud">
+    Alibaba Cloud OSS
+  </Card>
+</CardGroup>
+
+## Setting Up a Remote
+
+Add a remote storage location:
+
+```bash
+# Amazon S3
+dvc remote add -d myremote s3://mybucket/dvc-storage
+
+# Google Cloud Storage
+dvc remote add -d myremote gs://mybucket/dvc-storage
+
+# Azure Blob Storage
+dvc remote add -d myremote azure://mycontainer/path
+
+# SSH
+dvc remote add -d myremote ssh://user@example.com/path/to/storage
+
+# Local or network drive
+dvc remote add -d myremote /mnt/shared-storage
+```
+
+The `-d` flag sets it as the default remote.
+
+<Note>
+Remote configurations are stored in `.dvc/config` (project) or `.dvc/config.local` (user-specific).
+</Note>
+
+## The DataCloud Class
+
+Remote operations are managed by the `DataCloud` class in `dvc/data_cloud.py:67-125`:
+
+```python
+class DataCloud:
+    """Class that manages dvc remotes.
+    
+    Args:
+        repo (dvc.repo.Repo): repo instance that belongs to the repo that
+            we are working on.
+    
+    Raises:
+        config.ConfigError: thrown when config has invalid format.
+    """
+    
+    def __init__(self, repo):
+        self.repo = repo
+    
+    def get_remote(
+        self,
+        name: Optional[str] = None,
+        command: str = "<command>",
+    ) -> "Remote":
+        if not name:
+            name = self.repo.config["core"].get("remote")
+        
+        if name:
+            from dvc.fs import get_cloud_fs
+            
+            cls, config, fs_path = get_cloud_fs(self.repo.config, name=name)
+            # ... create and return Remote instance
+```
+
+### Remote Class
+
+Each remote is represented by a `Remote` object from `dvc/data_cloud.py:21-50`:
+
+```python
+class Remote:
+    def __init__(self, name: str, path: str, fs: "FileSystem", *, index=None, **config):
+        self.path = path
+        self.fs = fs
+        self.name = name
+        self.index = index
+        
+        self.worktree: bool = config.pop("worktree", False)
+        self.config = config
+    
+    @cached_property
+    def odb(self) -> "HashFileDB":
+        from dvc.cachemgr import CacheManager
+        from dvc_data.hashfile.db import get_odb
+        from dvc_data.hashfile.hash import DEFAULT_ALGORITHM
+        
+        path = self.path
+        if self.worktree:
+            path = self.fs.join(path, ".dvc", CacheManager.FILES_DIR, DEFAULT_ALGORITHM)
+        else:
+            path = self.fs.join(path, CacheManager.FILES_DIR, DEFAULT_ALGORITHM)
+        return get_odb(self.fs, path, hash_name=DEFAULT_ALGORITHM, **self.config)
+```
+
+## Pushing Data
+
+Upload tracked files to remote storage:
+
+```bash
+# Push all tracked data
+dvc push
+
+# Push specific files
+dvc push data/train.csv.dvc
+
+# Push to specific remote
+dvc push -r myremote
+
+# Push with multiple parallel jobs
+dvc push -j 8
+```
+
+The push implementation in `dvc/data_cloud.py:168-198`:
+
+```python
+def push(
+    self,
+    objs: Iterable["HashInfo"],
+    jobs: Optional[int] = None,
+    remote: Optional[str] = None,
+    odb: Optional["HashFileDB"] = None,
+) -> "TransferResult":
+    """Push data items in a cloud-agnostic way.
+    
+    Args:
+        objs: objects to push to the cloud.
+        jobs: number of jobs that can be running simultaneously.
+        remote: optional name of remote to push to.
+            By default remote from core.remote config option is used.
+        odb: optional ODB to push to. Overrides remote.
+    """
+    if odb is not None:
+        return self._push(objs, jobs=jobs, odb=odb)
+    legacy_objs, default_objs = _split_legacy_hash_infos(objs)
+    result = TransferResult(set(), set())
+    if legacy_objs:
+        odb = self.get_remote_odb(remote, "push", hash_name="md5-dos2unix")
+        t, f = self._push(legacy_objs, jobs=jobs, odb=odb)
+        result.transferred.update(t)
+        result.failed.update(f)
+    if default_objs:
+        odb = self.get_remote_odb(remote, "push")
+        t, f = self._push(default_objs, jobs=jobs, odb=odb)
+        result.transferred.update(t)
+        result.failed.update(f)
+    return result
+```
+
+<Tip>
+Use `dvc push -j 16` to speed up uploads with parallel transfers. Adjust based on your network and storage.
+</Tip>
+
+## Pulling Data
+
+Download tracked files from remote storage:
+
+```bash
+# Pull all tracked data
+dvc pull
+
+# Pull specific files
+dvc pull data/train.csv.dvc
+
+# Pull from specific remote
+dvc pull -r myremote
+
+# Pull with multiple parallel jobs
+dvc pull -j 8
+```
+
+DVC only downloads files that:
+- Are missing from your local cache
+- Have checksums different from what's in cache
+- Are required by your current `.dvc` files
+
+## Checking Status
+
+See what would be pushed/pulled:
+
+```bash
+# Check status against default remote
+dvc status -c
+
+# Check against specific remote
+dvc status -r myremote -c
+```
+
+Output shows:
+- Files that would be pushed
+- Files that would be pulled
+- Files not in cache
+
+## Remote Configuration
+
+Configure remote settings in `.dvc/config`:
+
+```ini
+[core]
+    remote = myremote
+
+['remote "myremote"']
+    url = s3://mybucket/dvc-storage
+    region = us-west-2
+    profile = myprofile
+```
+
+Or use commands:
+```bash
+# Set remote-specific options
+dvc remote modify myremote region us-west-2
+dvc remote modify myremote profile myprofile
+
+# For S3
+dvc remote modify myremote access_key_id YOUR_KEY
+dvc remote modify myremote secret_access_key YOUR_SECRET
+```
+
+<Warning>
+**Security**: Never commit credentials to Git. Use `.dvc/config.local` for sensitive settings or environment variables.
+</Warning>
+
+## Authentication
+
+### AWS S3
+
+```bash
+# Use AWS credentials file
+dvc remote modify myremote profile myprofile
+
+# Use environment variables
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+
+# Use IAM role (on EC2)
+# No configuration needed
+```
+
+### Google Cloud Storage
+
+```bash
+# Use service account
+export GOOGLE_APPLICATION_CREDENTIALS="path/to/credentials.json"
+
+# Or configure explicitly
+dvc remote modify myremote credentialpath path/to/credentials.json
+```
+
+### Azure Blob Storage
+
+```bash
+# Use connection string
+dvc remote modify myremote connection_string "..."
+
+# Or use account name and key
+dvc remote modify myremote account_name myaccount
+dvc remote modify myremote account_key "..."
+```
+
+### SSH
+
+```bash
+# Use SSH key
+dvc remote modify myremote keyfile ~/.ssh/id_rsa
+
+# Use password (not recommended)
+dvc remote modify myremote password mypassword
+
+# Use SSH agent
+dvc remote modify myremote ask_password true
+```
+
+## Advanced Features
+
+### Version-Aware Remotes
+
+For cloud storage with versioning (S3, GCS, Azure):
+
+```bash
+dvc remote modify myremote version_aware true
+```
+
+This enables:
+- Tracking specific object versions
+- Time travel to previous data states
+- Protection against accidental overwrites
+
+### Worktree Remotes
+
+Store data alongside another DVC repository:
+
+```bash
+dvc remote add -d shared /mnt/shared-dvc-repo
+dvc remote modify shared worktree true
+```
+
+This treats the remote as a full DVC workspace, not just a cache.
+
+### Read-Only Remotes
+
+Prevent accidental pushes:
+
+```bash
+dvc remote modify myremote read_only true
+```
+
+### Custom Storage Paths
+
+Organize remote storage:
+
+```bash
+# Store by branch
+dvc remote modify myremote url s3://bucket/${DVC_EXP_NAME}
+
+# Store by user
+dvc remote modify myremote url s3://bucket/${USER}
+```
+
+## Transfer Optimization
+
+### Parallel Jobs
+
+```bash
+# Use more parallel transfers
+dvc push -j 16
+dvc pull -j 16
+```
+
+### Partial Downloads
+
+Only download what you need:
+
+```bash
+# Pull specific pipeline stage
+dvc repro --pull train
+
+# Pull only metrics (small files)
+dvc pull --run-cache
+```
+
+### Retry Configuration
+
+```bash
+# Increase retry attempts for unreliable connections
+dvc remote modify myremote retry_count 10
+
+# Increase timeout
+dvc remote modify myremote timeout 300
+```
+
+## Hash Algorithm Handling
+
+DVC handles different hash algorithms for different storage types. From `dvc/data_cloud.py:52-64`:
+
+```python
+def _split_legacy_hash_infos(
+    hash_infos: Iterable["HashInfo"],
+) -> tuple[set["HashInfo"], set["HashInfo"]]:
+    from dvc.cachemgr import LEGACY_HASH_NAMES
+    
+    legacy = set()
+    default = set()
+    for hi in hash_infos:
+        if hi.name in LEGACY_HASH_NAMES:
+            legacy.add(hi)
+        else:
+            default.add(hi)
+    return legacy, default
+```
+
+This ensures compatibility between DVC versions and storage types:
+- **Local**: Uses md5 or md5-dos2unix
+- **S3/GCS**: Can use etag for efficiency
+- **HDFS**: Uses native checksum
+
+## Data Transfer Flow
+
+When you run `dvc push`, the data flow is:
+
+1. **Collect objects**: Gather all tracked files needing upload
+2. **Check remote**: Query which files already exist remotely
+3. **Transfer**: Upload missing files using storage backend
+4. **Verify**: Confirm successful uploads
+
+From `dvc/data_cloud.py:157-166`:
+```python
+def transfer(
+    self,
+    src_odb: "HashFileDB",
+    dest_odb: "HashFileDB",
+    objs: Iterable["HashInfo"],
+    **kwargs,
+) -> "TransferResult":
+    from dvc_data.hashfile.transfer import transfer
+    
+    return transfer(src_odb, dest_odb, objs, **kwargs)
+```
+
+## Multiple Remotes
+
+You can configure multiple remotes for different purposes:
+
+```bash
+# Default remote for team
+dvc remote add -d team s3://team-bucket/dvc-storage
+
+# Personal backup
+dvc remote add backup gs://my-personal-bucket/backup
+
+# Local cache for quick access
+dvc remote add local /mnt/fast-storage
+
+# Push to all remotes
+dvc push -r team
+dvc push -r backup
+```
+
+## Storage Costs and Optimization
+
+<CardGroup cols={2}>
+  <Card title="Deduplication" icon="copy">
+    DVC's content-addressable storage means identical files are stored once, even across projects
+  </Card>
+  
+  <Card title="Compression" icon="file-zipper">
+    Some storage backends support transparent compression (configure per-remote)
+  </Card>
+  
+  <Card title="Lifecycle Policies" icon="clock">
+    Use cloud provider features to archive or delete old data automatically
+  </Card>
+  
+  <Card title="Regional Storage" icon="earth-americas">
+    Store data in regions close to compute for faster access
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Connection Issues
+
+```bash
+# Test remote connectivity
+dvc remote list
+dvc status -c -r myremote
+
+# Increase verbosity
+dvc push -v
+dvc pull -vv
+```
+
+### Permission Errors
+
+```bash
+# Verify credentials
+aws s3 ls s3://mybucket/  # For S3
+gsutil ls gs://mybucket/  # For GCS
+
+# Check DVC configuration
+dvc config remote.myremote.url
+```
+
+### Large File Performance
+
+```bash
+# Use more parallel jobs
+dvc push -j 32
+
+# Skip checksum verification (faster but risky)
+dvc push --no-verify
+```
+
+## Related Commands
+
+- [`dvc remote`](/commands/remote) - Manage remote storage configurations
+- [`dvc push`](/commands/push) - Upload data to remote storage
+- [`dvc pull`](/commands/pull) - Download data from remote storage  
+- [`dvc fetch`](/commands/fetch) - Download to cache without checking out
+- [`dvc status`](/commands/status) - Check data status vs remote
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Versioning" href="/concepts/data-versioning" icon="database">
+    Understand how data is tracked and versioned locally
+  </Card>
+  
+  <Card title="Experiments" href="/concepts/experiments" icon="flask">
+    Share experiment results via remote storage
+  </Card>
+</CardGroup>

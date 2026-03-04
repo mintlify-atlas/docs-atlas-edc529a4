@@ -1,0 +1,229 @@
+---
+title: 'dvc params'
+description: 'Commands to display parameters'
+---
+
+## Description
+
+DVC params commands help you track and compare parameters (hyperparameters, configuration values) across different experiments and commits. Parameters are typically stored in YAML, JSON, TOML, or Python files and define model training configurations.
+
+## Subcommands
+
+### params diff
+
+Show changes in params between commits in the DVC repository, or between a commit and the workspace.
+
+<CodeGroup>
+```bash Compare HEAD with Workspace
+dvc params diff
+```
+
+```bash Compare Two Commits
+dvc params diff main feature-branch
+```
+
+```bash Show All Parameters
+dvc params diff --all
+```
+
+```bash Only Stage Dependencies
+dvc params diff --deps
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="a_rev" type="string" default="HEAD" optional>
+  Old Git commit to compare (defaults to HEAD).
+</ParamField>
+
+<ParamField path="b_rev" type="string" default="workspace" optional>
+  New Git commit to compare (defaults to the current workspace).
+</ParamField>
+
+#### Options
+
+<ParamField path="--targets" type="list" optional>
+  Specific params file(s) to compare (even if not found as `params` in `dvc.yaml`). Shows all tracked params by default.
+</ParamField>
+
+<ParamField path="--all" type="flag">
+  Show unchanged params as well.
+</ParamField>
+
+<ParamField path="--deps" type="flag">
+  Show only params that are stage dependencies.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Show output in JSON format.
+</ParamField>
+
+<ParamField path="--md" type="flag">
+  Show tabulated output in the Markdown format (GFM).
+</ParamField>
+
+<ParamField path="--no-path" type="flag">
+  Don't show params path.
+</ParamField>
+
+## Examples
+
+### Basic Parameter Comparison
+
+```bash
+$ dvc params diff
+```
+
+```
+Path         Param              HEAD     workspace
+params.yaml  model.learning_rate  0.001   0.01
+params.yaml  model.batch_size     32      64
+params.yaml  model.epochs         100     150
+```
+
+### Compare Specific Files
+
+```bash
+$ dvc params diff --targets params.yaml config/train.yaml
+```
+
+This compares only the specified parameter files.
+
+### Show Only Changed Parameters (Default)
+
+```bash
+$ dvc params diff HEAD~3 HEAD
+```
+
+Shows parameters that changed in the last 3 commits.
+
+### Include Unchanged Parameters
+
+```bash
+$ dvc params diff --all
+```
+
+```
+Path         Param                HEAD     workspace  
+params.yaml  model.learning_rate  0.001    0.01       (changed)
+params.yaml  model.batch_size     32       32         
+params.yaml  model.epochs         100      150        (changed)
+```
+
+### JSON Output for Automation
+
+```bash
+$ dvc params diff --json
+```
+
+```json
+{
+  "params.yaml": {
+    "model.learning_rate": {
+      "old": 0.001,
+      "new": 0.01,
+      "diff": 0.009
+    },
+    "model.epochs": {
+      "old": 100,
+      "new": 150,
+      "diff": 50
+    }
+  }
+}
+```
+
+<Tip>
+Use `--json` output with tools like `jq` for automated parameter validation in CI/CD pipelines.
+</Tip>
+
+### Show Only Stage Dependencies
+
+```bash
+$ dvc params diff --deps
+```
+
+Filters to show only parameters that are declared as dependencies in pipeline stages.
+
+<Note>
+The `--deps` flag is useful when you have many parameters but only want to see those that affect pipeline execution.
+</Note>
+
+## Parameter File Formats
+
+DVC supports multiple parameter file formats:
+
+<AccordionGroup>
+  <Accordion title="YAML" icon="file-code">
+    ```yaml params.yaml
+    model:
+      learning_rate: 0.001
+      batch_size: 32
+      epochs: 100
+    
+    preprocessing:
+      normalize: true
+      augmentation: false
+    ```
+  </Accordion>
+
+  <Accordion title="JSON" icon="brackets-curly">
+    ```json params.json
+    {
+      "model": {
+        "learning_rate": 0.001,
+        "batch_size": 32,
+        "epochs": 100
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="TOML" icon="file">
+    ```toml params.toml
+    [model]
+    learning_rate = 0.001
+    batch_size = 32
+    epochs = 100
+    ```
+  </Accordion>
+
+  <Accordion title="Python" icon="python">
+    ```python params.py
+    LEARNING_RATE = 0.001
+    BATCH_SIZE = 32
+    EPOCHS = 100
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Hyperparameter Tracking" icon="sliders">
+    Track how hyperparameters change across experiments and their impact on metrics.
+  </Card>
+  
+  <Card title="Experiment Comparison" icon="code-compare">
+    Compare parameter configurations between different experiment runs.
+  </Card>
+  
+  <Card title="Reproducibility" icon="clock-rotate-left">
+    Ensure exact parameter values are recorded for reproducing results.
+  </Card>
+  
+  <Card title="Configuration Management" icon="gears">
+    Manage different configurations for development, staging, and production.
+  </Card>
+</CardGroup>
+
+<Warning>
+Parameters must be tracked in `dvc.yaml` or passed explicitly via `--targets` to be compared.
+</Warning>
+
+## Related Commands
+
+- `dvc metrics` - Compare metrics across experiments
+- `dvc plots` - Visualize how parameters affect outcomes
+- `dvc exp show` - Show both params and metrics together

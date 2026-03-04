@@ -1,0 +1,462 @@
+---
+title: 'dvc remote'
+description: 'Set up and manage data remotes'
+---
+
+## Description
+
+DVC remote commands help you configure and manage remote storage locations where DVC stores cached data and model files. Remotes can be cloud storage (S3, GCS, Azure), network storage (SSH, HDFS), or local directories.
+
+## Subcommands
+
+### remote add
+
+Add a new data remote.
+
+<CodeGroup>
+```bash S3 Remote
+dvc remote add myremote s3://mybucket/path
+```
+
+```bash Google Cloud Storage
+dvc remote add myremote gs://mybucket/path
+```
+
+```bash Azure Blob Storage
+dvc remote add myremote azure://mycontainer/path
+```
+
+```bash SSH Remote
+dvc remote add myremote ssh://user@example.com/path/to/storage
+```
+
+```bash Local Directory
+dvc remote add myremote /tmp/dvc-storage
+```
+
+```bash Set as Default
+dvc remote add --default myremote s3://mybucket/path
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="name" type="string" required>
+  Name of the remote (converted to lowercase).
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Remote location. Supported URLs include:
+  - `s3://bucket/path` - Amazon S3
+  - `gs://bucket/path` - Google Cloud Storage
+  - `azure://container/path` - Azure Blob Storage
+  - `ssh://user@host/path` - SSH/SFTP
+  - `hdfs://namenode/path` - HDFS
+  - `/local/path` - Local directory
+  - `http://example.com/path` - HTTP
+  
+  See [full list of supported URLs](https://man.dvc.org/remote).
+</ParamField>
+
+#### Options
+
+<ParamField path="-d, --default" type="flag">
+  Set as default remote.
+</ParamField>
+
+<ParamField path="-f, --force" type="flag">
+  Force overwriting existing configs.
+</ParamField>
+
+<ParamField path="--global" type="flag">
+  Use global config (~/.config/dvc/config).
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config (.dvc/config).
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config (.dvc/config.local).
+</ParamField>
+
+---
+
+### remote default
+
+Set/unset the default data remote.
+
+<CodeGroup>
+```bash Set Default Remote
+dvc remote default myremote
+```
+
+```bash Show Current Default
+dvc remote default
+```
+
+```bash Unset Default
+dvc remote default --unset
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="name" type="string" optional>
+  Name of the remote to set as default. Omit to show current default.
+</ParamField>
+
+#### Options
+
+<ParamField path="-u, --unset" type="flag">
+  Unset default remote.
+</ParamField>
+
+<ParamField path="--global" type="flag">
+  Use global config.
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config.
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config.
+</ParamField>
+
+---
+
+### remote list
+
+List all available data remotes.
+
+```bash
+dvc remote list
+```
+
+#### Example Output
+
+```
+myremote    s3://mybucket/path    (default)
+backup      gs://backup-bucket/dvc-storage
+local       /mnt/shared/dvc-cache
+```
+
+<Info>
+The default remote is highlighted in green and marked with "(default)".
+</Info>
+
+---
+
+### remote modify
+
+Modify the configuration of a data remote.
+
+<CodeGroup>
+```bash AWS Credentials
+dvc remote modify myremote access_key_id AKIAIOSFODNN7EXAMPLE
+dvc remote modify myremote secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+```bash Set Region
+dvc remote modify myremote region us-west-2
+```
+
+```bash Enable SSL Verify
+dvc remote modify myremote ssl_verify true
+```
+
+```bash Custom Endpoint
+dvc remote modify myremote endpointurl https://s3.example.com
+```
+
+```bash Unset Option
+dvc remote modify myremote access_key_id --unset
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="name" type="string" required>
+  Name of the remote.
+</ParamField>
+
+<ParamField path="option" type="string" required>
+  Name of the option to modify. Common options:
+  - `access_key_id`, `secret_access_key` - AWS credentials
+  - `region` - AWS region
+  - `profile` - AWS profile name
+  - `endpointurl` - Custom endpoint URL
+  - `ssl_verify` - Enable/disable SSL verification
+  - `url` - Change remote URL
+</ParamField>
+
+<ParamField path="value" type="string" optional>
+  Value of the option. Omit when using `--unset`.
+</ParamField>
+
+#### Options
+
+<ParamField path="-u, --unset" type="flag">
+  Unset option.
+</ParamField>
+
+<ParamField path="--global" type="flag">
+  Use global config.
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config.
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config.
+</ParamField>
+
+---
+
+### remote remove
+
+Remove a data remote.
+
+```bash
+dvc remote remove myremote
+```
+
+#### Arguments
+
+<ParamField path="name" type="string" required>
+  Name of the remote to remove.
+</ParamField>
+
+#### Options
+
+<ParamField path="--global" type="flag">
+  Use global config.
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config.
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config.
+</ParamField>
+
+---
+
+### remote rename
+
+Rename a DVC remote.
+
+```bash
+dvc remote rename oldname newname
+```
+
+#### Arguments
+
+<ParamField path="name" type="string" required>
+  Remote to be renamed.
+</ParamField>
+
+<ParamField path="new" type="string" required>
+  New name of the remote.
+</ParamField>
+
+#### Options
+
+<ParamField path="--global" type="flag">
+  Use global config.
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config.
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config.
+</ParamField>
+
+## Examples
+
+### Setting Up AWS S3 Remote
+
+```bash
+# Add S3 remote
+dvc remote add -d storage s3://my-bucket/dvc-storage
+
+# Configure AWS credentials (stored in .dvc/config.local)
+dvc remote modify --local storage access_key_id AKIAIOSFODNN7EXAMPLE
+dvc remote modify --local storage secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+# Set region
+dvc remote modify storage region us-east-1
+
+# Push data to remote
+dvc push
+```
+
+<Tip>
+Store credentials in `.dvc/config.local` (not tracked by Git) using `--local` flag for security.
+</Tip>
+
+### Setting Up Google Cloud Storage
+
+```bash
+# Add GCS remote
+dvc remote add -d storage gs://my-bucket/dvc-storage
+
+# Configure using service account
+dvc remote modify storage credentialpath credentials.json
+
+# Or use default application credentials
+dvc remote modify storage credentialpath ''
+```
+
+### Multiple Remotes for Different Purposes
+
+```bash
+# Production remote
+dvc remote add prod s3://prod-bucket/dvc-cache
+dvc remote default prod
+
+# Staging remote
+dvc remote add staging s3://staging-bucket/dvc-cache
+
+# Local backup
+dvc remote add backup /mnt/backup/dvc-storage
+
+# Push to specific remote
+dvc push -r staging
+```
+
+### SSH Remote with Key Authentication
+
+```bash
+# Add SSH remote
+dvc remote add storage ssh://user@example.com/data/dvc-storage
+
+# Configure SSH key
+dvc remote modify storage keyfile ~/.ssh/id_rsa
+
+# Set custom port
+dvc remote modify storage port 2222
+```
+
+## Supported Storage Types
+
+<CardGroup cols={2}>
+  <Card title="Amazon S3" icon="aws">
+    AWS S3 and S3-compatible storage (MinIO, DigitalOcean Spaces)
+  </Card>
+  
+  <Card title="Google Cloud Storage" icon="google">
+    GCS buckets with service account or default credentials
+  </Card>
+  
+  <Card title="Azure Blob Storage" icon="microsoft">
+    Azure containers with connection string or SAS token
+  </Card>
+  
+  <Card title="SSH/SFTP" icon="server">
+    Remote servers via SSH with key or password authentication
+  </Card>
+  
+  <Card title="HDFS" icon="database">
+    Hadoop Distributed File System
+  </Card>
+  
+  <Card title="HTTP/HTTPS" icon="globe">
+    Read-only HTTP servers (for pulling data)
+  </Card>
+  
+  <Card title="Local Directory" icon="folder">
+    Network-mounted directories or local paths
+  </Card>
+  
+  <Card title="WebDAV" icon="cloud">
+    WebDAV protocol (Nextcloud, ownCloud)
+  </Card>
+</CardGroup>
+
+## Configuration Levels
+
+DVC supports four configuration levels (in order of precedence):
+
+<Steps>
+  <Step title="Local (.dvc/config.local)">
+    Machine-specific settings, not tracked by Git. **Use for credentials**.
+  </Step>
+  
+  <Step title="Project (.dvc/config)">
+    Project-wide settings, tracked by Git. **Use for remote URLs**.
+  </Step>
+  
+  <Step title="Global (~/.config/dvc/config)">
+    User-wide settings across all projects.
+  </Step>
+  
+  <Step title="System (/etc/dvc/config)">
+    System-wide settings for all users.
+  </Step>
+</Steps>
+
+<Warning>
+**Security Best Practice:** Never commit credentials to Git. Always use `--local` flag when setting sensitive options like `access_key_id` or `password`.
+</Warning>
+
+## Common Remote Options
+
+### AWS S3 Options
+
+- `access_key_id` - AWS access key
+- `secret_access_key` - AWS secret key
+- `region` - AWS region (e.g., us-east-1)
+- `profile` - AWS CLI profile name
+- `endpoint_url` - Custom S3 endpoint
+- `ssl_verify` - Enable/disable SSL verification
+
+### Google Cloud Storage Options
+
+- `credentialpath` - Path to service account JSON file
+- `projectname` - GCP project name
+
+### Azure Options
+
+- `connection_string` - Azure storage connection string
+- `account_name` - Storage account name
+- `sas_token` - Shared Access Signature token
+
+### SSH Options
+
+- `keyfile` - Path to SSH private key
+- `password` - SSH password
+- `port` - SSH port (default: 22)
+- `timeout` - Connection timeout
+
+## Related Commands
+
+- `dvc push` - Upload data to remote storage
+- `dvc pull` - Download data from remote storage
+- `dvc fetch` - Download data to cache without checkout
+- `dvc config` - Direct configuration management

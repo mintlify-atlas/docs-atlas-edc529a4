@@ -1,0 +1,474 @@
+---
+title: 'dvc.api.read()'
+description: 'Read complete contents of DVC-tracked files in a single function call'
+icon: 'file-lines'
+---
+
+<Note>
+Source: [dvc/api/data.py:305-330](~/workspace/source/dvc/api/data.py)
+</Note>
+
+## Description
+
+Returns the complete contents of a file tracked by DVC or Git. This is a convenience function that reads the entire file at once without requiring a context manager.
+
+For Git repositories, `HEAD` is used unless a `rev` argument is supplied. The default remote is tried unless a `remote` argument is supplied.
+
+<Tip>
+For large files, consider using `dvc.api.open()` instead to stream data and avoid loading the entire file into memory.
+</Tip>
+
+## Signature
+
+```python
+dvc.api.read(
+    path: str,
+    repo: Optional[str] = None,
+    rev: Optional[str] = None,
+    remote: Optional[str] = None,
+    mode: str = "r",
+    encoding: Optional[str] = None,
+    config: Optional[dict[str, Any]] = None,
+    remote_config: Optional[dict[str, Any]] = None,
+) -> Union[str, bytes]
+```
+
+## Parameters
+
+<ParamField path="path" type="str" required>
+  Location and filename of the target file, relative to the root of the repository.
+  
+  ```python
+  path="data/train.csv"
+  path="configs/params.yaml"
+  path="models/weights.pkl"
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC or Git repository. Defaults to the current project (found by walking up from the current working directory).
+  
+  Can be:
+  - A URL to a Git repository (HTTP or SSH)
+  - A local file system path
+  - `None` to use the current repository
+  
+  ```python
+  # Remote repository
+  repo="https://github.com/iterative/example-get-started"
+  
+  # SSH URL
+  repo="git@github.com:user/repo.git"
+  
+  # Local path
+  repo="/home/user/my-dvc-project"
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Any Git revision such as a branch name, tag name, commit hash, or DVC experiment name.
+  
+  - Defaults to `HEAD` for Git repositories
+  - For local repositories, uses the working directory if not specified
+  - Ignored if `repo` is not a Git repository
+  
+  ```python
+  rev="main"               # Branch
+  rev="v2.0.0"             # Tag
+  rev="a3f5c2d"            # Commit hash  
+  rev="exp-best-model"     # Experiment
+  ```
+</ParamField>
+
+<ParamField path="remote" type="str" default="None">
+  Name of the DVC remote to use for fetching data. Defaults to the repository's default remote.
+  
+  For local projects, the cache is checked before the default remote.
+  
+  ```python
+  remote="myremote"
+  remote="aws-s3-storage"
+  ```
+</ParamField>
+
+<ParamField path="mode" type="str" default="r">
+  Mode in which to open the file. Defaults to `"r"` (read text mode).
+  
+  **Only reading modes are supported:**
+  - `"r"` - Read text mode (returns `str`)
+  - `"rb"` - Read binary mode (returns `bytes`)
+  
+  ```python
+  mode="r"   # For text files
+  mode="rb"  # For binary files
+  ```
+</ParamField>
+
+<ParamField path="encoding" type="str" default="None">
+  Text encoding to use (e.g., `"utf-8"`, `"latin-1"`). Only applicable in text mode (`mode="r"`).
+  
+  Mirrors the encoding parameter in Python's built-in `open()`.
+  
+  ```python
+  encoding="utf-8"
+  encoding="iso-8859-1"
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  DVC config dictionary to pass to the repository.
+  
+  ```python
+  config={"cache": {"dir": "/tmp/dvc-cache"}}
+  ```
+</ParamField>
+
+<ParamField path="remote_config" type="dict" default="None">
+  Remote configuration dictionary to pass to the repository.
+  
+  ```python
+  remote_config={"url": "s3://my-bucket/dvc-storage"}
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="contents" type="Union[str, bytes]">
+  The complete contents of the file:
+  - Returns `str` when `mode="r"` (text mode)
+  - Returns `bytes` when `mode="rb"` (binary mode)
+</ResponseField>
+
+## Raises
+
+<ResponseField name="FileMissingError" type="exception">
+  Raised when the specified file does not exist in the repository.
+</ResponseField>
+
+<ResponseField name="OutputNotFoundError" type="exception">
+  Raised when the file is not tracked by DVC.
+</ResponseField>
+
+<ResponseField name="ValueError" type="exception">
+  Raised when a non-read mode is specified.
+</ResponseField>
+
+## Examples
+
+### Basic Text File Reading
+
+```python
+import dvc.api
+
+# Read a CSV file
+data = dvc.api.read(
+    'data/train.csv',
+    repo='https://github.com/iterative/example-get-started'
+)
+print(data)
+```
+
+### Read Configuration File
+
+```python
+import dvc.api
+import yaml
+
+# Read YAML parameters
+params_yaml = dvc.api.read('params.yaml')
+params = yaml.safe_load(params_yaml)
+
+print(f"Learning rate: {params['train']['lr']}")
+print(f"Epochs: {params['train']['epochs']}")
+```
+
+### Read JSON Metrics
+
+```python
+import dvc.api
+import json
+
+# Read metrics from a specific branch
+metrics_json = dvc.api.read(
+    'metrics/accuracy.json',
+    rev='experiment-branch'
+)
+metrics = json.loads(metrics_json)
+
+print(f"Accuracy: {metrics['accuracy']}")
+print(f"F1 Score: {metrics['f1_score']}")
+```
+
+### Binary File Reading
+
+```python
+import dvc.api
+import pickle
+
+# Read a pickled model (binary mode)
+model_bytes = dvc.api.read(
+    'models/classifier.pkl',
+    mode='rb',
+    rev='production'
+)
+model = pickle.loads(model_bytes)
+
+predictions = model.predict(X_test)
+```
+
+### Read from Specific Tag
+
+```python
+import dvc.api
+
+# Get data from a released version
+data_v1 = dvc.api.read(
+    'data/dataset.csv',
+    repo='https://github.com/user/ml-project',
+    rev='v1.0.0'
+)
+
+data_v2 = dvc.api.read(
+    'data/dataset.csv',
+    repo='https://github.com/user/ml-project',
+    rev='v2.0.0'
+)
+
+print(f"V1 size: {len(data_v1)} bytes")
+print(f"V2 size: {len(data_v2)} bytes")
+```
+
+### Private Repository with SSH
+
+```python
+import dvc.api
+
+# Access private repository (requires SSH keys configured)
+data = dvc.api.read(
+    'sensitive/data.txt',
+    repo='git@github.com:company/private-repo.git',
+    rev='main'
+)
+```
+
+### Read with Custom Encoding
+
+```python
+import dvc.api
+
+# Read file with specific encoding
+data = dvc.api.read(
+    'data/international.txt',
+    encoding='utf-16'
+)
+print(data)
+```
+
+### Read NumPy Array
+
+```python
+import dvc.api
+import numpy as np
+from io import BytesIO
+
+# Read binary NumPy file
+array_bytes = dvc.api.read(
+    'data/features.npy',
+    mode='rb'
+)
+array = np.load(BytesIO(array_bytes))
+
+print(f"Shape: {array.shape}")
+print(f"Dtype: {array.dtype}")
+```
+
+### Read from Local Repository
+
+```python
+import dvc.api
+
+# Read from local project by path
+data = dvc.api.read(
+    'data/processed.csv',
+    repo='/path/to/my/project'
+)
+```
+
+### Error Handling
+
+```python
+import dvc.api
+from dvc.exceptions import FileMissingError, OutputNotFoundError
+
+try:
+    data = dvc.api.read(
+        'data/missing.csv',
+        repo='https://github.com/user/repo'
+    )
+except OutputNotFoundError:
+    print("File is not tracked by DVC")
+except FileMissingError:
+    print("File does not exist in the repository")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Configuration Loading" icon="gear">
+  Load parameters, configs, or metadata files for experiments.
+</Card>
+
+<Card title="Small Data Files" icon="file">
+  Read datasets that fit comfortably in memory.
+</Card>
+
+<Card title="Model Loading" icon="brain">
+  Load serialized models for inference or evaluation.
+</Card>
+
+<Card title="Metrics Retrieval" icon="chart-simple">
+  Fetch experiment metrics for analysis and comparison.
+</Card>
+
+</CardGroup>
+
+## Comparison with dvc.api.open()
+
+<Info>
+`read()` is a convenience wrapper around `open()` that reads the entire file and returns its contents.
+</Info>
+
+| Feature | `dvc.api.read()` | `dvc.api.open()` |
+|---------|------------------|------------------|
+| **Usage** | Simple function call | Context manager (`with` statement) |
+| **Returns** | Complete file contents | File object for streaming |
+| **Memory** | Loads entire file | Streams incrementally |
+| **Best for** | Small files | Large files |
+| **Code** | `data = dvc.api.read('file.csv')` | `with dvc.api.open('file.csv') as f: ...` |
+
+```python
+# Using read() - Simpler for small files
+data = dvc.api.read('small_config.json')
+config = json.loads(data)
+
+# Using open() - Better for large files
+with dvc.api.open('large_dataset.csv') as f:
+    for line in f:
+        process(line)
+```
+
+## Performance Considerations
+
+<Warning>
+`read()` loads the entire file into memory. For large files (>100MB), use `dvc.api.open()` to stream data instead.
+</Warning>
+
+<Tabs>
+  <Tab title="Small Files (<10MB)">
+    ```python
+    # Efficient for small files
+    data = dvc.api.read('config.json')
+    ```
+  </Tab>
+  
+  <Tab title="Medium Files (10-100MB)">
+    ```python
+    # Consider streaming if memory is limited
+    with dvc.api.open('medium_file.csv') as f:
+        data = f.read()
+    ```
+  </Tab>
+  
+  <Tab title="Large Files (>100MB)">
+    ```python
+    # Always stream large files
+    with dvc.api.open('large_file.csv') as f:
+        for chunk in f:
+            process(chunk)
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Use for small files only">
+  `read()` is ideal for configuration files, parameters, and small datasets:
+  
+  ```python
+  # ✅ Good - Small config file
+  params = yaml.safe_load(dvc.api.read('params.yaml'))
+  
+  # ❌ Bad - Large dataset (use open() instead)
+  data = dvc.api.read('huge_dataset.csv')  # May cause memory issues
+  ```
+</Accordion>
+
+<Accordion title="Choose correct mode">
+  Use text mode for text files and binary mode for binary data:
+  
+  ```python
+  # Text files
+  text = dvc.api.read('data.txt', mode='r')
+  
+  # Binary files
+  data = dvc.api.read('model.pkl', mode='rb')
+  ```
+</Accordion>
+
+<Accordion title="Parse returned data appropriately">
+  Remember to parse the returned string/bytes:
+  
+  ```python
+  # JSON
+  json_str = dvc.api.read('data.json')
+  data = json.loads(json_str)
+  
+  # YAML
+  yaml_str = dvc.api.read('config.yaml')
+  config = yaml.safe_load(yaml_str)
+  
+  # CSV (use open() for large CSVs)
+  csv_str = dvc.api.read('small.csv')
+  lines = csv_str.split('\n')
+  ```
+</Accordion>
+
+<Accordion title="Handle exceptions properly">
+  Always catch potential exceptions:
+  
+  ```python
+  from dvc.exceptions import FileMissingError, OutputNotFoundError
+  
+  try:
+      data = dvc.api.read('data.csv')
+  except OutputNotFoundError:
+      print("Not tracked by DVC")
+  except FileMissingError:
+      print("File not found")
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="open()" icon="folder-open" href="/api/open">
+  Stream files with context manager
+</Card>
+
+<Card title="get_url()" icon="link" href="/api/get_url">
+  Get remote storage URL
+</Card>
+
+<Card title="DVCFileSystem" icon="folder-tree" href="/api/dvcfilesystem">
+  Low-level file system access
+</Card>
+
+</CardGroup>

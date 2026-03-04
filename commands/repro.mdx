@@ -1,0 +1,532 @@
+---
+title: dvc repro
+description: Reproduce complete or partial pipelines by executing their stages.
+---
+
+## Synopsis
+
+```bash
+dvc repro [options] [targets...]
+```
+
+## Description
+
+The `dvc repro` command reproduces (executes) stages in your DVC pipeline. It's the primary way to run your ML workflows after defining stages with `dvc stage add`.
+
+DVC automatically determines which stages need to be run by:
+- Checking if dependencies have changed
+- Checking if outputs are missing
+- Checking if stage commands have changed
+- Checking if parameters have changed
+
+Only stages that need updating are executed, making pipeline reproduction efficient. DVC respects the dependency graph and executes stages in the correct order.
+
+<Info>
+  **Smart execution**: DVC uses checksums to detect changes and only runs stages when necessary. This is similar to how `make` works but optimized for data pipelines.
+</Info>
+
+## Arguments
+
+<ParamField path="targets" type="string[]">
+  Stages to reproduce. Defaults to `dvc.yaml` in the current directory.
+  
+  Targets can be:
+  - Path to a `dvc.yaml` or `.dvc` file
+  - Stage name from `dvc.yaml` in current directory  
+  - Path with stage name: `path/to/dvc.yaml:stage_name`
+  
+  **Examples:**
+  ```bash
+  dvc repro                    # Reproduce all stages in dvc.yaml
+  dvc repro train              # Reproduce specific stage
+  dvc repro ml/dvc.yaml:train  # Reproduce stage in specific file
+  ```
+</ParamField>
+
+## Options
+
+### Execution Control
+
+<ParamField path="-f, --force" type="boolean">
+  Reproduce even if dependencies were not changed. Forces execution of specified stages regardless of whether DVC detects changes.
+  
+  ```bash
+  dvc repro -f train
+  ```
+</ParamField>
+
+<ParamField path="--dry" type="boolean">
+  Only print the commands that would be executed without actually executing them. Useful for previewing what will run.
+  
+  ```bash
+  dvc repro --dry
+  ```
+  
+  Output:
+  ```
+  Running stage 'prepare':
+  > python prepare.py
+  Running stage 'train':  
+  > python train.py
+  ```
+</ParamField>
+
+<ParamField path="-i, --interactive" type="boolean">
+  Ask for confirmation before reproducing each stage. DVC will prompt you before executing each stage command.
+  
+  ```bash
+  dvc repro -i
+  ```
+</ParamField>
+
+### Pipeline Selection
+
+<ParamField path="-s, --single-item" type="boolean">
+  Reproduce only single data item without recursive dependencies check. Runs only the specified stage(s) without checking or running dependencies.
+  
+  ```bash
+  dvc repro -s evaluate
+  ```
+  
+  <Warning>
+    Using `-s` may result in inconsistent outputs if dependencies have changed.
+  </Warning>
+</ParamField>
+
+<ParamField path="-p, --pipeline" type="boolean">
+  Reproduce the whole pipeline that the specified targets belong to. Executes all stages from the beginning of the pipeline.
+  
+  ```bash
+  dvc repro -p train  # Runs entire pipeline including stages before train
+  ```
+</ParamField>
+
+<ParamField path="-P, --all-pipelines" type="boolean">
+  Reproduce all pipelines in the repository. Useful for ensuring entire project is up to date.
+  
+  ```bash
+  dvc repro -P
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean">
+  Reproduce all stages in the specified directory recursively. Finds all `dvc.yaml` files in subdirectories.
+  
+  ```bash
+  dvc repro -R pipelines/
+  ```
+</ParamField>
+
+<ParamField path="--downstream" type="boolean">
+  Start from the specified stages when reproducing pipelines. Runs the specified stage and all stages that depend on it.
+  
+  ```bash
+  dvc repro --downstream prepare
+  ```
+</ParamField>
+
+<ParamField path="--force-downstream" type="boolean">
+  Reproduce all descendants of a changed stage even if their direct dependencies didn't change.
+  
+  Useful when you want to ensure all downstream stages are updated after modifying a stage.
+  
+  ```bash
+  dvc repro --force-downstream
+  ```
+</ParamField>
+
+### Data Management
+
+<ParamField path="--pull" type="boolean">
+  Try automatically pulling missing data before reproduction. If dependencies are missing, DVC attempts to download them from remote storage.
+  
+  ```bash
+  dvc repro --pull
+  ```
+</ParamField>
+
+<ParamField path="--allow-missing" type="boolean">
+  Skip stages with missing data but no other changes. Continues execution even if some dependencies are unavailable.
+  
+  ```bash
+  dvc repro --allow-missing
+  ```
+</ParamField>
+
+<ParamField path="--no-commit" type="boolean">
+  Don't put files/directories into cache. Runs stages but doesn't cache outputs.
+  
+  ```bash
+  dvc repro --no-commit
+  ```
+  
+  <Tip>
+    Useful for testing pipeline changes without polluting the cache.
+  </Tip>
+</ParamField>
+
+### Advanced Options
+
+<ParamField path="--no-run-cache" type="boolean">
+  Execute stage commands even if they have already been run with the same command/dependencies/outputs/etc before.
+  
+  DVC maintains a run cache to avoid re-executing identical commands. This flag disables that optimization.
+  
+  ```bash
+  dvc repro --no-run-cache
+  ```
+</ParamField>
+
+<ParamField path="--glob" type="boolean">
+  Allows targets containing shell-style wildcards.
+  
+  ```bash
+  dvc repro --glob "**/train*"
+  ```
+</ParamField>
+
+### Error Handling
+
+<ParamField path="-k, --keep-going" type="boolean">
+  Continue executing, skipping stages having dependencies on the failed stages. If a stage fails, DVC continues with independent stages.
+  
+  ```bash
+  dvc repro -k
+  ```
+</ParamField>
+
+<ParamField path="--ignore-errors" type="boolean">
+  Ignore errors from stages. Pipeline execution continues even when stages fail.
+  
+  ```bash
+  dvc repro --ignore-errors
+  ```
+  
+  <Warning>
+    Use with caution. This can result in incomplete or incorrect outputs.
+  </Warning>
+</ParamField>
+
+## Examples
+
+### Basic reproduction
+
+Reproduce all stages in the default `dvc.yaml`:
+
+```bash
+dvc repro
+```
+
+Output:
+```
+Running stage 'prepare':
+> python prepare.py
+Updating lock file 'dvc.lock'
+
+Running stage 'train':
+> python train.py  
+Updating lock file 'dvc.lock'
+
+Use `dvc push` to send your updates to remote storage.
+```
+
+<Info>
+  If no stages need to run, DVC will output: "Data and pipelines are up to date."
+</Info>
+
+### Reproduce specific stage
+
+```bash
+dvc repro train
+```
+
+This runs the `train` stage and any of its dependencies that have changed.
+
+### Force reproduction
+
+Run a stage even if DVC thinks it's up to date:
+
+```bash
+dvc repro -f train
+```
+
+<Tip>
+  Useful when you've made code changes that don't affect tracked dependencies, or when debugging.
+</Tip>
+
+### Dry run to preview execution
+
+```bash
+dvc repro --dry
+```
+
+Output:
+```
+Running stage 'prepare' with command:
+    python prepare.py
+Running stage 'featurize' with command:
+    python featurize.py
+Running stage 'train' with command:
+    python train.py --config params.yaml
+```
+
+### Interactive reproduction
+
+```bash
+dvc repro -i
+```
+
+Output:
+```
+Run stage 'prepare' with command 'python prepare.py'? [y/n] y
+Running stage 'prepare'...
+
+Run stage 'train' with command 'python train.py'? [y/n] n
+Skipping stage 'train'.
+```
+
+### Reproduce entire pipeline
+
+Even if you specify a single stage, reproduce from the beginning:
+
+```bash
+dvc repro -p evaluate
+```
+
+This ensures all stages (prepare, train, evaluate) are run in order.
+
+### Reproduce all pipelines in project
+
+```bash
+dvc repro -P
+```
+
+This finds and reproduces all `dvc.yaml` files in your repository.
+
+### Reproduce with automatic data pull
+
+```bash
+dvc repro --pull
+```
+
+If any dependencies are missing, DVC tries to download them from remote storage before running.
+
+### Reproduce downstream stages
+
+Run a stage and everything that depends on it:
+
+```bash
+dvc repro --downstream prepare
+```
+
+If `prepare` produces data used by `train` and `evaluate`, all three will run.
+
+### Continue on failure
+
+```bash
+dvc repro -k
+```
+
+If you have independent pipeline branches and one fails, others will continue.
+
+### Reproduce without caching
+
+```bash
+dvc repro --no-commit
+```
+
+Runs stages but doesn't cache outputs. Useful during development.
+
+### Complex example: Force reproduce with downstream
+
+```bash
+dvc repro -f --force-downstream prepare
+```
+
+This forces `prepare` to run, then forces all downstream stages (train, evaluate, etc.) to run regardless of whether their direct dependencies changed.
+
+## Working with dvc.lock
+
+When you run `dvc repro`, DVC updates `dvc.lock` to record:
+- Checksums of dependencies
+- Checksums of outputs
+- Parameter values used
+- Commands executed
+
+**Example dvc.lock:**
+```yaml
+schema: '2.0'
+stages:
+  train:
+    cmd: python train.py
+    deps:
+    - path: data/prepared.csv
+      md5: 9a0d8f5e13de2c60f8c0f0b6c5aef8e3
+      size: 150000
+    - path: src/train.py
+      md5: 4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+      size: 2048
+    params:
+      params.yaml:
+        train.epochs: 10
+        train.lr: 0.001
+    outs:
+    - path: models/model.pkl
+      md5: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+      size: 1048576
+```
+
+<Note>
+  Always commit `dvc.lock` to Git. It ensures reproducibility by capturing the exact state of your pipeline.
+</Note>
+
+## Understanding Stage Execution
+
+### When does a stage run?
+
+A stage is executed if:
+
+1. **Dependencies changed**: Input files have different checksums
+2. **Outputs missing**: Output files don't exist or are missing from cache
+3. **Command changed**: The stage command was modified in `dvc.yaml`
+4. **Parameters changed**: Tracked parameters have different values
+5. **Forced execution**: You used `-f` or `--force`
+
+### Execution order
+
+DVC analyzes the dependency graph and executes stages in topological order:
+
+```
+prepare → featurize → train → evaluate
+                        ↓
+                    train_baseline
+```
+
+Stages with no dependencies run first. Stages run only after their dependencies complete.
+
+## Common Workflows
+
+### Development workflow
+
+```bash
+# Make code changes
+vim src/train.py
+
+# Test without caching
+dvc repro --no-commit train
+
+# When satisfied, run with caching
+dvc repro train
+
+# Commit changes
+git add dvc.yaml dvc.lock src/train.py
+git commit -m "Update training script"
+
+# Push outputs to remote storage
+dvc push
+```
+
+### Reproducing on a different machine
+
+```bash
+# Clone repository
+git clone <repo-url>
+cd <repo>
+
+# Pull data from remote storage
+dvc pull
+
+# Reproduce pipeline
+dvc repro
+```
+
+### Debugging pipeline issues
+
+```bash
+# Preview what will run
+dvc repro --dry
+
+# Run interactively
+dvc repro -i
+
+# Run single stage without dependencies
+dvc repro -s problematic_stage
+```
+
+### Updating after parameter changes
+
+When you modify `params.yaml`:
+
+```bash
+# Edit parameters
+vim params.yaml
+
+# Reproduce - only affected stages run
+dvc repro
+```
+
+DVC automatically detects which stages depend on the changed parameters.
+
+## Performance Tips
+
+<Tip>
+  **Use run cache**: DVC's run cache prevents re-running identical commands. Keep it enabled unless you have a specific reason to disable it.
+</Tip>
+
+<Tip>
+  **Incremental execution**: DVC only runs what's necessary. Structure your pipeline with granular stages to maximize cache hits.
+</Tip>
+
+<Tip>
+  **Parallel execution**: While `dvc repro` executes stages sequentially, independent pipeline branches can be run in parallel manually using job schedulers or multiple terminals.
+</Tip>
+
+## Troubleshooting
+
+### Pipeline appears up to date but shouldn't be
+
+Use `-f` to force execution:
+```bash
+dvc repro -f
+```
+
+### Missing dependencies error
+
+Try pulling data first:
+```bash
+dvc repro --pull
+```
+
+Or allow missing dependencies:
+```bash
+dvc repro --allow-missing
+```
+
+### Stage keeps running unnecessarily
+
+Check if files are being modified by the command:
+```bash
+dvc repro --dry
+```
+
+Consider using `--outs-persist` for outputs that shouldn't be removed between runs.
+
+### Lock file conflicts
+
+If you have merge conflicts in `dvc.lock`:
+```bash
+# Resolve Git conflict
+git checkout --theirs dvc.lock
+# Or: git checkout --ours dvc.lock
+
+# Reproduce to regenerate lock file
+dvc repro
+```
+
+## See Also
+
+- [dvc stage add](/commands/stage) - Create pipeline stages
+- [dvc dag](/commands/dag) - Visualize pipeline structure  
+- [dvc push](/commands/push) - Upload outputs to remote storage
+- [dvc pull](/commands/pull) - Download outputs from remote storage
+- [dvc status](/commands/status) - Show pipeline status

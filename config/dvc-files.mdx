@@ -1,0 +1,604 @@
+---
+title: DVC Files Format
+description: Understanding .dvc files, dvc.yaml, and dvc.lock structure
+---
+
+DVC uses several file formats to track data, define pipelines, and lock reproducible states. This guide explains the structure and purpose of each file type.
+
+## File Types Overview
+
+<CardGroup cols={3}>
+  <Card title=".dvc Files" icon="file-code">
+    Single-stage files for tracking data
+  </Card>
+  <Card title="dvc.yaml" icon="diagram-project">
+    Multi-stage pipeline definitions
+  </Card>
+  <Card title="dvc.lock" icon="lock">
+    Lock file for reproducibility
+  </Card>
+</CardGroup>
+
+## .dvc Files (Single-Stage Files)
+
+`.dvc` files are used to track individual data files or directories. They're created with `dvc add` or when defining single-stage operations.
+
+### Basic Structure
+
+A typical `.dvc` file contains output metadata:
+
+```yaml
+outs:
+- md5: a304afb96060aad90176268345e10355
+  size: 37891850
+  path: model.pkl
+```
+
+### Complete Schema
+
+<ParamField path="outs" type="array" required>
+  List of output files or directories tracked by this .dvc file
+  
+  <Expandable title="Output Object Properties">
+    <ParamField path="path" type="string" required>
+      Path to the file or directory
+    </ParamField>
+    
+    <ParamField path="md5" type="string">
+      MD5 checksum of the file or directory
+    </ParamField>
+    
+    <ParamField path="size" type="integer">
+      Size in bytes
+    </ParamField>
+    
+    <ParamField path="nfiles" type="integer">
+      Number of files (for directories)
+    </ParamField>
+    
+    <ParamField path="cache" type="boolean" default="true">
+      Whether to cache this output
+    </ParamField>
+    
+    <ParamField path="persist" type="boolean" default="false">
+      Keep output file between runs
+    </ParamField>
+    
+    <ParamField path="remote" type="string">
+      Specific remote to use for this output
+    </ParamField>
+    
+    <ParamField path="push" type="boolean" default="true">
+      Whether to push this output to remote storage
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="deps" type="array">
+  List of dependencies (for single-stage files with commands)
+</ParamField>
+
+<ParamField path="cmd" type="string">
+  Command to execute (for single-stage files)
+</ParamField>
+
+<ParamField path="wdir" type="string">
+  Working directory for the command
+</ParamField>
+
+<ParamField path="md5" type="string">
+  MD5 checksum of the stage definition
+</ParamField>
+
+<ParamField path="frozen" type="boolean" default="false">
+  Whether the stage is frozen (won't be re-executed)
+</ParamField>
+
+<ParamField path="always_changed" type="boolean" default="false">
+  Always consider this stage as changed
+</ParamField>
+
+<ParamField path="meta" type="object">
+  Custom metadata for the stage
+</ParamField>
+
+<ParamField path="desc" type="string">
+  Description of the stage
+</ParamField>
+
+### Examples
+
+<Accordion title="Tracking a single file">
+  ```yaml
+  outs:
+  - md5: 3d1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+    size: 1024000
+    path: data/dataset.csv
+  ```
+</Accordion>
+
+<Accordion title="Tracking a directory">
+  ```yaml
+  outs:
+  - md5: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.dir
+    size: 50000000
+    nfiles: 1000
+    path: data/images
+  ```
+  
+  <Note>
+    Directory checksums end with `.dir` and represent a hash of all files within.
+  </Note>
+</Accordion>
+
+<Accordion title="Single-stage with command">
+  ```yaml
+  cmd: python preprocess.py
+  deps:
+  - path: raw_data.csv
+    md5: 5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c
+    size: 2048000
+  outs:
+  - md5: a304afb96060aad90176268345e10355
+    size: 1536000
+    path: processed_data.csv
+  md5: 9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e
+  ```
+</Accordion>
+
+<Accordion title="Output with custom remote">
+  ```yaml
+  outs:
+  - md5: e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+    size: 5000000
+    path: large_model.pkl
+    remote: s3-large-files
+    push: true
+  ```
+</Accordion>
+
+<Accordion title="Non-cached output">
+  ```yaml
+  outs:
+  - md5: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+    size: 1024
+    path: metrics.json
+    cache: false
+  ```
+  
+  <Info>
+    Setting `cache: false` is useful for small files like metrics that don't need caching.
+  </Info>
+</Accordion>
+
+## dvc.yaml (Pipeline Files)
+
+`dvc.yaml` files define multi-stage pipelines with dependencies, parameters, and outputs.
+
+### Basic Structure
+
+```yaml
+stages:
+  prepare:
+    cmd: python prepare.py
+    deps:
+      - raw_data.csv
+    outs:
+      - prepared_data.csv
+
+  train:
+    cmd: python train.py
+    deps:
+      - prepared_data.csv
+      - train.py
+    params:
+      - lr
+      - epochs
+    outs:
+      - model.pkl
+    metrics:
+      - metrics.json:
+          cache: false
+```
+
+### Complete Schema
+
+<ParamField path="stages" type="object" required>
+  Dictionary of pipeline stages, where keys are stage names
+  
+  <Expandable title="Stage Object Properties">
+    <ParamField path="cmd" type="string | array" required>
+      Command to execute. Can be a string or list of commands
+    </ParamField>
+    
+    <ParamField path="wdir" type="string">
+      Working directory for the command (relative to dvc.yaml location)
+    </ParamField>
+    
+    <ParamField path="deps" type="array">
+      List of dependency file paths
+    </ParamField>
+    
+    <ParamField path="params" type="array">
+      List of parameters from params.yaml. Can be:
+      - Simple strings: `["lr", "epochs"]`
+      - Custom file: `[{"config.yaml": ["model.type"]}]`
+    </ParamField>
+    
+    <ParamField path="outs" type="array">
+      List of output files. Can be paths or objects with options
+    </ParamField>
+    
+    <ParamField path="metrics" type="array">
+      List of metric files (automatically set `cache: false`)
+    </ParamField>
+    
+    <ParamField path="plots" type="array">
+      List of plot files with optional configuration
+    </ParamField>
+    
+    <ParamField path="frozen" type="boolean" default="false">
+      Prevent stage from running
+    </ParamField>
+    
+    <ParamField path="always_changed" type="boolean" default="false">
+      Always run this stage
+    </ParamField>
+    
+    <ParamField path="meta" type="object">
+      Custom metadata (preserved but not used by DVC)
+    </ParamField>
+    
+    <ParamField path="desc" type="string">
+      Human-readable description
+    </ParamField>
+    
+    <ParamField path="foreach" type="array | object | string">
+      Iterate over items to create multiple stage instances
+    </ParamField>
+    
+    <ParamField path="matrix" type="object">
+      Define parameter matrix for stage variations
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="vars" type="array | object">
+  Variables that can be referenced in the pipeline using `${var}`
+</ParamField>
+
+<ParamField path="params" type="array">
+  Global parameter files to track
+</ParamField>
+
+<ParamField path="metrics" type="array">
+  Global metric files
+</ParamField>
+
+<ParamField path="plots" type="array">
+  Global plot definitions
+</ParamField>
+
+<ParamField path="artifacts" type="object">
+  Model registry artifacts
+</ParamField>
+
+<ParamField path="datasets" type="array">
+  Dataset definitions
+</ParamField>
+
+### Advanced Examples
+
+<Accordion title="Stage with detailed outputs">
+  ```yaml
+  stages:
+    train:
+      cmd: python train.py
+      deps:
+        - data/train.csv
+      params:
+        - model.architecture
+        - training.epochs
+      outs:
+        - model.pkl:
+            desc: "Trained XGBoost model"
+            remote: s3-models
+      metrics:
+        - metrics.json:
+            cache: false
+      plots:
+        - plots/training_loss.csv:
+            x: epoch
+            y: loss
+            title: "Training Loss"
+  ```
+</Accordion>
+
+<Accordion title="Multi-command stage">
+  ```yaml
+  stages:
+    build:
+      cmd:
+        - echo "Building model..."
+        - python build.py
+        - echo "Build complete"
+      outs:
+        - model/
+  ```
+</Accordion>
+
+<Accordion title="Foreach iteration">
+  ```yaml
+  stages:
+    process:
+      foreach:
+        - train
+        - test
+        - val
+      do:
+        cmd: python process.py ${item}
+        deps:
+          - raw/${item}.csv
+        outs:
+          - processed/${item}.csv
+  ```
+  
+  <Info>
+    This creates three stages: `process@train`, `process@test`, and `process@val`.
+  </Info>
+</Accordion>
+
+<Accordion title="Matrix for hyperparameter sweep">
+  ```yaml
+  stages:
+    train:
+      matrix:
+        lr: [0.001, 0.01, 0.1]
+        optimizer: [adam, sgd]
+      cmd: python train.py --lr ${item.lr} --opt ${item.optimizer}
+      outs:
+        - models/${item.lr}-${item.optimizer}.pkl
+  ```
+</Accordion>
+
+<Accordion title="Using variables">
+  ```yaml
+  vars:
+    - data_dir: /mnt/data
+    - model_name: xgboost_v2
+
+  stages:
+    train:
+      cmd: python train.py --data ${data_dir} --name ${model_name}
+      deps:
+        - ${data_dir}/train.csv
+      outs:
+        - models/${model_name}.pkl
+  ```
+</Accordion>
+
+<Accordion title="Working directory example">
+  ```yaml
+  stages:
+    train:
+      wdir: ../experiments
+      cmd: python train.py
+      deps:
+        - ../data/dataset.csv
+      outs:
+        - model.pkl
+  ```
+  
+  <Warning>
+    Dependencies and outputs are relative to the dvc.yaml location, not the working directory.
+  </Warning>
+</Accordion>
+
+## dvc.lock (Lock Files)
+
+`dvc.lock` is automatically generated and should not be edited manually. It ensures reproducibility by recording exact states.
+
+### Structure
+
+```yaml
+schema: '2.0'
+stages:
+  train:
+    cmd: python train.py
+    deps:
+    - path: data/train.csv
+      md5: a304afb96060aad90176268345e10355
+      size: 1536000
+    - path: train.py
+      md5: 5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c
+      size: 4096
+    params:
+      params.yaml:
+        lr: 0.001
+        epochs: 100
+    outs:
+    - path: model.pkl
+      md5: e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+      size: 5000000
+```
+
+### Schema Fields
+
+<ParamField path="schema" type="string" required>
+  Lock file schema version (currently "2.0")
+</ParamField>
+
+<ParamField path="stages" type="object">
+  Locked state of each stage
+  
+  <Expandable title="Locked Stage Properties">
+    <ParamField path="cmd" type="string | array">
+      Exact command that was executed
+    </ParamField>
+    
+    <ParamField path="deps" type="array">
+      Dependencies with checksums
+      
+      Each dependency includes:
+      - `path`: File path
+      - `md5`: Checksum
+      - `size`: File size in bytes
+    </ParamField>
+    
+    <ParamField path="params" type="object">
+      Parameter files with exact values used
+      
+      Format: `{"params.yaml": {"lr": 0.001}}`
+    </ParamField>
+    
+    <ParamField path="outs" type="array">
+      Outputs with checksums and metadata
+      
+      Each output includes:
+      - `path`: File path
+      - `md5`: Checksum (`.dir` suffix for directories)
+      - `size`: Size in bytes
+      - `nfiles`: File count (for directories)
+      - `files`: File listing (when tracked with `--with-files`)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="datasets" type="array">
+  Locked dataset states
+</ParamField>
+
+### Lock File Features
+
+<Info>
+  DVC uses the lock file to determine if a stage needs to be re-executed:
+  - If dependencies or parameters change, the stage runs again
+  - If the lock file matches current state, the stage is skipped
+</Info>
+
+<Warning>
+  Always commit `dvc.lock` to version control. It's essential for reproducibility
+  and collaboration.
+</Warning>
+
+## File Naming Conventions
+
+<CardGroup cols={2}>
+  <Card title="Valid .dvc filenames">
+    - `data.csv.dvc`
+    - `model.pkl.dvc`
+    - `images.dvc`
+    - `any_name.dvc`
+  </Card>
+  
+  <Card title="Pipeline files">
+    - `dvc.yaml` (standard)
+    - `dvc.lock` (auto-generated)
+    - Custom: `pipeline.yaml` ❌
+    - Custom: `train.dvc.yaml` ❌
+  </Card>
+</CardGroup>
+
+<Note>
+  Pipeline files must be named exactly `dvc.yaml`. The `.dvc` extension is only
+  for single-stage tracking files.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Commit all DVC files to Git">
+    Always track these files:
+    - `.dvc` files
+    - `dvc.yaml`
+    - `dvc.lock`
+    - `params.yaml`
+    
+    Never track:
+    - Actual data files
+    - Cache directories
+    - `.dvc/config.local`
+  </Accordion>
+
+  <Accordion title="Use descriptive stage names">
+    Good:
+    ```yaml
+    stages:
+      preprocess_data:
+      train_model:
+      evaluate_model:
+    ```
+    
+    Bad:
+    ```yaml
+    stages:
+      step1:
+      step2:
+      step3:
+    ```
+  </Accordion>
+
+  <Accordion title="Add descriptions to stages">
+    ```yaml
+    stages:
+      train:
+        desc: |
+          Train XGBoost model using preprocessed data.
+          Outputs model.pkl and training metrics.
+        cmd: python train.py
+    ```
+  </Accordion>
+
+  <Accordion title="Organize parameters by purpose">
+    ```yaml
+    stages:
+      train:
+        params:
+          - model.type
+          - model.hyperparameters
+          - training.epochs
+          - training.batch_size
+    ```
+  </Accordion>
+
+  <Accordion title="Use meaningful metadata">
+    ```yaml
+    stages:
+      train:
+        meta:
+          author: data-science-team
+          model_version: v2.1
+          experiment_id: exp-2024-001
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+```bash
+# Create .dvc file
+dvc add data/dataset.csv
+
+# Create pipeline stage
+dvc stage add -n train -d data.csv -o model.pkl python train.py
+
+# Run pipeline and update dvc.lock
+dvc repro
+
+# Validate dvc.yaml syntax
+dvc dag
+
+# Show pipeline structure
+dvc dag --md
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/config/overview">
+    Learn about DVC configuration files
+  </Card>
+  <Card title="Remote Storage" icon="cloud" href="/config/remote-config">
+    Configure remote storage backends
+  </Card>
+</CardGroup>

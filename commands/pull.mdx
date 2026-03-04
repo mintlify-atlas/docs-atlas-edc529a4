@@ -1,0 +1,508 @@
+---
+title: dvc pull
+description: Download tracked files or directories from remote storage
+---
+
+## Synopsis
+
+```bash
+dvc pull [options] [<targets>...]
+```
+
+## Description
+
+The `dvc pull` command downloads DVC-tracked files from remote storage to your local cache and checks them out to your workspace. It's a combination of `dvc fetch` and `dvc checkout`.
+
+This is analogous to `git pull` but for your data files. Use `dvc pull` to:
+
+- Get data after cloning a repository
+- Sync data after pulling Git changes
+- Download data for a specific branch or experiment
+- Restore missing or deleted data files
+
+The command:
+
+1. Downloads missing files from remote storage to local cache
+2. Creates links (or copies) from cache to workspace
+3. Updates your workspace to match the `.dvc` file specifications
+
+<Info>
+You must configure a remote storage location before using `dvc pull`. Use `dvc remote add` to set up a remote, or check `.dvc/config` if your team has already configured one.
+</Info>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names. If not specified, pulls all tracked data.
+  
+  ```bash
+  dvc pull data/train.csv models/model.pkl
+  ```
+</ParamField>
+
+<ParamField path="-r, --remote" type="string">
+  Remote storage to pull from. If not specified, uses the default remote configured in `.dvc/config`.
+  
+  ```bash
+  dvc pull --remote s3storage
+  ```
+</ParamField>
+
+<ParamField path="-j, --jobs" type="integer" default="4 * cpu_count()">
+  Number of jobs to run simultaneously. Higher values increase parallelism but use more resources.
+  
+  ```bash
+  dvc pull --jobs 8
+  ```
+</ParamField>
+
+<ParamField path="-a, --all-branches" type="boolean" default="false">
+  Fetch cache for all Git branches.
+  
+  ```bash
+  dvc pull --all-branches
+  ```
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="boolean" default="false">
+  Fetch cache for all Git tags.
+  
+  ```bash
+  dvc pull --all-tags
+  ```
+</ParamField>
+
+<ParamField path="-A, --all-commits" type="boolean" default="false">
+  Fetch cache for all Git commits.
+  
+  <Warning>
+  This can download a very large amount of data. Use with caution.
+  </Warning>
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Do not prompt when removing working directory files. Forces overwrite of modified files.
+  
+  ```bash
+  dvc pull --force
+  ```
+  
+  <Warning>
+  This will discard any local modifications to tracked files.
+  </Warning>
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Fetch cache for all dependencies of the specified target.
+  
+  ```bash
+  dvc pull --with-deps evaluate.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Pull cache for subdirectories of the specified directory.
+  
+  ```bash
+  dvc pull --recursive experiments/
+  ```
+</ParamField>
+
+<ParamField path="--run-cache" type="boolean" default="false">
+  Fetch run history for all stages.
+  
+  ```bash
+  dvc pull --run-cache
+  ```
+</ParamField>
+
+<ParamField path="--allow-missing" type="boolean" default="false">
+  Ignore errors if some of the files or directories are missing from remote.
+  
+  <Tip>
+  Useful in CI/CD where you may not need all data files.
+  </Tip>
+</ParamField>
+
+## Examples
+
+### Basic pull
+
+Pull all tracked data from the default remote:
+
+```bash
+dvc pull
+```
+
+```terminal
+A       data/train.csv
+A       data/test.csv
+A       models/model.pkl
+2 files fetched
+```
+
+Or if everything is up to date:
+
+```terminal
+Everything is up to date.
+```
+
+### Initial setup after cloning
+
+Common workflow after cloning a repository:
+
+```bash
+# Clone the repository
+git clone <repo-url>
+cd <repo-name>
+
+# Pull the data
+dvc pull
+```
+
+```terminal
+Fetching data from remote...
+A       data/dataset.csv
+A       models/model.pkl
+2 files fetched
+```
+
+### Pull after Git changes
+
+Sync data after pulling Git changes:
+
+```bash
+# Pull Git changes
+git pull
+
+# Pull corresponding data
+dvc pull
+```
+
+```terminal
+M       data/train.csv
+M       models/model.pkl
+2 files fetched
+```
+
+### Pull specific files
+
+Pull only specific targets:
+
+```bash
+dvc pull data/train.csv.dvc
+```
+
+```terminal
+A       data/train.csv
+1 file fetched
+```
+
+### Pull from specific remote
+
+Pull from a named remote:
+
+```bash
+dvc pull --remote backup
+```
+
+### Pull with higher parallelism
+
+Speed up pull with more concurrent jobs:
+
+```bash
+dvc pull --jobs 16
+```
+
+### Force pull
+
+Overwrite local changes:
+
+```bash
+dvc pull --force
+```
+
+<Warning>
+This discards any uncommitted local changes to tracked files.
+</Warning>
+
+### Pull with dependencies
+
+Pull a pipeline stage and all its dependencies:
+
+```bash
+dvc pull --with-deps train.dvc
+```
+
+```terminal
+A       data/raw.csv
+A       data/processed.csv
+A       models/model.pkl
+3 files fetched
+```
+
+### Pull all branches
+
+Fetch data for all branches (useful for caching):
+
+```bash
+dvc pull --all-branches
+```
+
+```terminal
+main:
+        2 files fetched
+experiment-1:
+        3 files fetched
+experiment-2:
+        1 file fetched
+```
+
+## Example workflows
+
+### Workflow 1: New team member
+
+```bash
+# 1. Clone repository
+git clone https://github.com/company/ml-project.git
+cd ml-project
+
+# 2. Pull all data
+dvc pull
+
+# 3. Verify data is present
+ls data/
+ls models/
+
+# 4. Start working
+python train.py
+```
+
+### Workflow 2: Switch branches
+
+```bash
+# Switch to experiment branch
+git checkout experiment-branch
+
+# Pull corresponding data
+dvc pull
+
+# Run experiments
+python experiment.py
+```
+
+### Workflow 3: Sync with team changes
+
+```bash
+# Get latest changes from team
+git pull origin main
+
+# Sync data
+dvc pull
+
+# Verify what changed
+git log --oneline -5
+dvc diff HEAD~1
+```
+
+### Workflow 4: CI/CD pipeline
+
+```bash
+#!/bin/bash
+# ci-script.sh
+
+# Setup
+git clone $REPO_URL
+cd project
+
+# Pull only necessary data
+dvc pull --with-deps model_training.dvc
+
+# Run training
+python train.py
+
+# Run tests
+python test_model.py
+```
+
+### Workflow 5: Selective data loading
+
+```bash
+# Pull only training data (not test or validation)
+dvc pull data/train.csv.dvc
+
+# Train model
+python train.py
+
+# Pull test data only when needed
+dvc pull data/test.csv.dvc
+
+# Evaluate
+python evaluate.py
+```
+
+## Setting up remotes
+
+Before using `dvc pull`, ensure a remote is configured:
+
+```bash
+# Check configured remotes
+dvc remote list
+
+# Add a remote if needed
+dvc remote add -d myremote s3://mybucket/path
+
+# Or check team configuration
+cat .dvc/config
+```
+
+Common remote types:
+
+```bash
+# Amazon S3
+dvc remote add myremote s3://mybucket/dvc-storage
+
+# Google Cloud Storage
+dvc remote add myremote gs://mybucket/dvc-storage
+
+# Azure Blob Storage
+dvc remote add myremote azure://mycontainer/path
+
+# SSH
+dvc remote add myremote ssh://user@host/path/to/storage
+```
+
+## Understanding pull output
+
+File status indicators:
+
+| Symbol | Meaning |
+|--------|----------|
+| `A` | Added (new file created) |
+| `M` | Modified (file was updated) |
+| `D` | Deleted (file was removed) |
+
+Summary line:
+
+```terminal
+5 files fetched
+```
+
+Or when everything is synced:
+
+```terminal
+Everything is up to date.
+```
+
+## Error handling
+
+### No remote configured
+
+```terminal
+ERROR: no remote provided and no default remote set
+```
+
+**Solution**: Configure a remote:
+
+```bash
+dvc remote add -d origin <remote-url>
+```
+
+### Authentication errors
+
+```terminal
+ERROR: failed to pull data from the cloud
+```
+
+**Solution**: Configure credentials. For S3:
+
+```bash
+# Using environment variables
+export AWS_ACCESS_KEY_ID=your_key
+export AWS_SECRET_ACCESS_KEY=your_secret
+
+# Or configure in DVC
+dvc remote modify origin access_key_id your_key
+dvc remote modify origin secret_access_key your_secret
+```
+
+### Missing files in remote
+
+```terminal
+ERROR: failed to pull data - file not found in remote
+```
+
+**Solution**: Either:
+
+1. Ask teammate to push: `dvc push`
+2. Use `--allow-missing` to skip missing files:
+   ```bash
+   dvc pull --allow-missing
+   ```
+
+### Network interruption
+
+If pull is interrupted, simply run it again:
+
+```bash
+dvc pull
+```
+
+DVC will resume from where it left off.
+
+## Difference between pull, fetch, and checkout
+
+| Command | Downloads from remote | Updates workspace |
+|---------|----------------------|-------------------|
+| `dvc pull` | ✓ | ✓ |
+| `dvc fetch` | ✓ | ✗ |
+| `dvc checkout` | ✗ | ✓ |
+
+<Info>
+**Use `dvc pull`** for most cases - it does both fetch and checkout.
+
+**Use `dvc fetch`** when you want to pre-download data without changing workspace.
+
+**Use `dvc checkout`** when data is already in cache and you just need to update workspace.
+</Info>
+
+## Performance tips
+
+<Tip>
+**Increase parallelism** - Use `--jobs` for faster downloads:
+```bash
+dvc pull --jobs 16
+```
+</Tip>
+
+<Tip>
+**Pull selectively** - Only pull what you need:
+```bash
+dvc pull data/train.csv.dvc models/
+```
+</Tip>
+
+<Tip>
+**Use --allow-missing** - In CI/CD, skip missing files to avoid errors:
+```bash
+dvc pull --allow-missing
+```
+</Tip>
+
+<Tip>
+**Pre-fetch in CI** - Cache DVC data between CI runs to speed up builds.
+</Tip>
+
+## Best practices
+
+1. **Always pull after git pull**: Keep data in sync with code
+2. **Pull before starting work**: Ensure you have latest data
+3. **Use specific targets in CI**: Only pull data needed for tests
+4. **Configure credentials securely**: Use environment variables or IAM roles
+
+## Related commands
+
+- `dvc push` - Upload data to remote storage
+- `dvc fetch` - Download to cache only
+- `dvc checkout` - Update workspace from cache
+- `dvc status` - Check sync status with remote

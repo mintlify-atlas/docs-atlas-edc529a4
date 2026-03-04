@@ -1,0 +1,344 @@
+---
+title: 'dvc version'
+description: 'Display the DVC version and system/environment information'
+---
+
+## Description
+
+The `dvc version` command displays the installed DVC version along with detailed system and environment information. This is useful for debugging, reporting issues, and verifying your installation.
+
+## Usage
+
+```bash
+dvc version
+```
+
+**Alias:** `dvc doctor`
+
+<CodeGroup>
+```bash Version Command
+dvc version
+```
+
+```bash Using Alias
+dvc doctor
+```
+</CodeGroup>
+
+## Arguments
+
+This command takes no arguments.
+
+## Options
+
+This command has no options.
+
+## Example Output
+
+```bash
+$ dvc version
+```
+
+```yaml
+DVC version: 3.48.2 (pip)
+---------------------------------
+Platform: Python 3.11.7 on Linux-5.15.0-91-generic-x86_64-with-glibc2.35
+Supports:
+    azure (adlfs = 2024.2.0, knack = 0.11.0, azure-identity = 1.15.0),
+    gdrive (pydrive2 = 1.19.0),
+    gs (gcsfs = 2024.2.0),
+    http (aiohttp = 3.9.3, aiohttp-retry = 2.8.3),
+    https (aiohttp = 3.9.3, aiohttp-retry = 2.8.3),
+    oss (ossfs = 2023.12.0),
+    s3 (s3fs = 2024.2.0, boto3 = 1.34.51),
+    ssh (sshfs = 2024.2.0),
+    webdav (webdav4 = 0.9.8),
+    webdavs (webdav4 = 0.9.8)
+Cache types: hardlink, symlink
+Cache directory: ext4 on /dev/sda1
+Caches:
+    local: md5
+Remotes:
+    azure, gdrive, gs, http, https, oss, s3, ssh, webdav, webdavs
+Repo: dvc (no_scm), git
+```
+
+## Information Displayed
+
+The `dvc version` command provides comprehensive diagnostic information:
+
+<AccordionGroup>
+  <Accordion title="DVC Version" icon="tag">
+    The installed version of DVC and installation method (pip, conda, binary, etc.).
+    
+    ```
+    DVC version: 3.48.2 (pip)
+    ```
+  </Accordion>
+
+  <Accordion title="Platform" icon="computer">
+    Python version, operating system, and architecture.
+    
+    ```
+    Platform: Python 3.11.7 on Linux-5.15.0-91-generic-x86_64-with-glibc2.35
+    ```
+  </Accordion>
+
+  <Accordion title="Supports" icon="plug">
+    Available storage protocol support and their dependency versions.
+    
+    - **azure** - Azure Blob Storage
+    - **gdrive** - Google Drive
+    - **gs** - Google Cloud Storage
+    - **http/https** - HTTP(S) sources
+    - **oss** - Alibaba Cloud OSS
+    - **s3** - Amazon S3
+    - **ssh** - SSH/SFTP
+    - **webdav/webdavs** - WebDAV protocol
+  </Accordion>
+
+  <Accordion title="Cache Types" icon="link">
+    Available file link types for cache.
+    
+    - **hardlink** - Hard links (default)
+    - **symlink** - Symbolic links
+    - **reflink** - Copy-on-write links (if filesystem supports)
+    - **copy** - Full file copies
+  </Accordion>
+
+  <Accordion title="Cache Directory" icon="hard-drive">
+    Filesystem type and location of cache directory.
+    
+    ```
+    Cache directory: ext4 on /dev/sda1
+    ```
+  </Accordion>
+
+  <Accordion title="Caches" icon="database">
+    Hash algorithms available for cache.
+    
+    ```
+    Caches: local: md5
+    ```
+  </Accordion>
+
+  <Accordion title="Remotes" icon="cloud">
+    Configured remote storage types.
+    
+    ```
+    Remotes: azure, gdrive, gs, http, https, oss, s3, ssh, webdav, webdavs
+    ```
+  </Accordion>
+
+  <Accordion title="Repo" icon="folder">
+    Repository type and SCM information.
+    
+    ```
+    Repo: dvc (no_scm), git
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Version Check" icon="circle-check">
+    Verify you have the correct DVC version installed.
+  </Card>
+  
+  <Card title="Bug Reports" icon="bug">
+    Include full version output when reporting issues to help maintainers reproduce problems.
+  </Card>
+  
+  <Card title="Feature Availability" icon="list-check">
+    Check which storage protocols and features are available in your installation.
+  </Card>
+  
+  <Card title="Environment Debugging" icon="magnifying-glass">
+    Diagnose environment issues, dependency conflicts, or missing features.
+  </Card>
+</CardGroup>
+
+## Examples
+
+### Check DVC Version
+
+```bash
+$ dvc version | head -n 1
+```
+
+```
+DVC version: 3.48.2 (pip)
+```
+
+### Verify Storage Support
+
+Check if a specific storage protocol is supported:
+
+```bash
+$ dvc version | grep -A 10 "Supports:" | grep s3
+```
+
+```
+    s3 (s3fs = 2024.2.0, boto3 = 1.34.51),
+```
+
+<Tip>
+If a storage protocol is missing, you may need to install additional dependencies:
+
+```bash
+pip install 'dvc[s3]'      # For S3
+pip install 'dvc[gs]'      # For Google Cloud Storage
+pip install 'dvc[azure]'   # For Azure
+pip install 'dvc[ssh]'     # For SSH
+pip install 'dvc[all]'     # For all storage types
+```
+</Tip>
+
+### Check Python Version
+
+```bash
+$ dvc version | grep Platform
+```
+
+```
+Platform: Python 3.11.7 on Linux-5.15.0-91-generic-x86_64-with-glibc2.35
+```
+
+### Save Version Info to File
+
+Useful for bug reports or documentation:
+
+```bash
+$ dvc version > dvc-version-info.txt
+```
+
+## Version Update Check
+
+When running `dvc version`, DVC may also check for updates:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Update available 3.48.2 → 3.49.0                     │
+│ Run `pip install --upgrade dvc` to upgrade           │
+└──────────────────────────────────────────────────────┘
+```
+
+<Info>
+You can disable update checks with:
+
+```bash
+dvc config core.check_update false
+```
+</Info>
+
+## Troubleshooting
+
+### Missing Storage Support
+
+If you see limited storage support:
+
+```
+Supports:
+    http (aiohttp = 3.9.3, aiohttp-retry = 2.8.3),
+    https (aiohttp = 3.9.3, aiohttp-retry = 2.8.3)
+```
+
+**Solution:** Install storage-specific extras:
+
+```bash
+pip install 'dvc[s3,gs,azure,ssh]'
+```
+
+### Version Mismatch
+
+If you're running a different version than expected:
+
+```bash
+# Check where DVC is installed
+which dvc
+
+# Upgrade to latest version
+pip install --upgrade dvc
+
+# Or install specific version
+pip install dvc==3.48.2
+```
+
+### Import Errors
+
+If DVC fails to import storage dependencies:
+
+```
+ERROR: failed to load 's3' support
+```
+
+**Solution:** Reinstall with required extras:
+
+```bash
+pip install --force-reinstall 'dvc[s3]'
+```
+
+## Installation Methods
+
+The version output shows how DVC was installed:
+
+<Tabs>
+  <Tab title="pip">
+    ```bash
+    pip install dvc
+    # Or with extras:
+    pip install 'dvc[all]'
+    ```
+    
+    Output: `DVC version: 3.48.2 (pip)`
+  </Tab>
+  
+  <Tab title="conda">
+    ```bash
+    conda install -c conda-forge dvc
+    ```
+    
+    Output: `DVC version: 3.48.2 (conda)`
+  </Tab>
+  
+  <Tab title="Homebrew">
+    ```bash
+    brew install dvc
+    ```
+    
+    Output: `DVC version: 3.48.2 (binary)`
+  </Tab>
+  
+  <Tab title="Binary">
+    Download from [DVC releases](https://github.com/iterative/dvc/releases)
+    
+    Output: `DVC version: 3.48.2 (binary)`
+  </Tab>
+</Tabs>
+
+## Related Commands
+
+- `dvc config` - Configure DVC settings including update checks
+- `dvc init` - Initialize DVC repository
+- `pip install --upgrade dvc` - Upgrade DVC to the latest version
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Release Notes" icon="newspaper" href="https://github.com/iterative/dvc/releases">
+    View changelog and new features for each version
+  </Card>
+  
+  <Card title="Installation Guide" icon="download" href="https://dvc.org/doc/install">
+    Detailed installation instructions for all platforms
+  </Card>
+  
+  <Card title="Report Issues" icon="github" href="https://github.com/iterative/dvc/issues">
+    Report bugs or request features
+  </Card>
+  
+  <Card title="Community" icon="comments" href="https://dvc.org/chat">
+    Get help from the DVC community
+  </Card>
+</CardGroup>

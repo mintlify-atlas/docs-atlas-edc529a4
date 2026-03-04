@@ -1,0 +1,387 @@
+---
+title: dvc diff
+description: Show added, modified, or deleted data between commits
+---
+
+## Synopsis
+
+```bash
+dvc diff [options] [<a_rev>] [<b_rev>] [--targets <paths>...]
+```
+
+## Description
+
+The `dvc diff` command shows differences in DVC-tracked data between:
+
+- Two Git commits
+- A commit and the current workspace
+- Any two Git references (branches, tags, commits)
+
+This helps you understand what data has changed across different versions of your project, similar to how `git diff` shows code changes. It's particularly useful for:
+
+- Comparing model outputs between experiments
+- Tracking dataset evolution over time
+- Understanding what changed in a specific commit
+- Generating reports on data modifications
+
+The output shows which files were added, deleted, modified, or renamed, optionally with their hash values.
+
+<Info>
+`dvc diff` only shows structural changes (which files changed) and their hashes. For detailed content differences in metrics or params, use `dvc metrics diff` or `dvc params diff`.
+</Info>
+
+## Options
+
+<ParamField path="a_rev" type="string" default="HEAD">
+  Old Git commit to compare from. Can be a commit hash, branch name, or tag.
+  
+  ```bash
+  dvc diff main
+  dvc diff abc123
+  dvc diff v1.0
+  ```
+</ParamField>
+
+<ParamField path="b_rev" type="string">
+  New Git commit to compare to. Defaults to the current workspace if not specified.
+  
+  ```bash
+  dvc diff main experiment
+  dvc diff v1.0 v2.0
+  ```
+</ParamField>
+
+<ParamField path="--targets" type="path[]">
+  Specific DVC-tracked files to compare. Accepts one or more file paths.
+  
+  ```bash
+  dvc diff --targets data/train.csv models/model.pkl
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Format the output as JSON. Useful for programmatic parsing.
+  
+  ```bash
+  dvc diff --json HEAD~1
+  ```
+</ParamField>
+
+<ParamField path="--show-hash" type="boolean" default="false">
+  Display hash values for each entry. Shows first 8 characters of the hash.
+  
+  ```bash
+  dvc diff --show-hash
+  ```
+</ParamField>
+
+<ParamField path="--md" type="boolean" default="false">
+  Show tabulated output in Markdown format (GitHub Flavored Markdown).
+  
+  ```bash
+  dvc diff --md HEAD~1 > changes.md
+  ```
+  
+  <Tip>
+  Great for including in pull request descriptions or documentation.
+  </Tip>
+</ParamField>
+
+<ParamField path="--hide-missing" type="boolean" default="false">
+  Hide files that are not in cache. By default, missing files are shown with "not in cache" status.
+</ParamField>
+
+## Examples
+
+### Compare workspace with HEAD
+
+See what data changed since the last commit:
+
+```bash
+dvc diff
+```
+
+```terminal
+Modified:
+    d3b07384  data/train.csv
+    
+Added:
+    f98bf6f1  models/new_model.pkl
+
+files summary: 1 modified, 1 added
+```
+
+### Compare two commits
+
+Compare data between two specific commits:
+
+```bash
+dvc diff main experiment
+```
+
+```terminal
+Modified:
+    c157a790..f98bf6f1  models/model.pkl
+    
+Deleted:
+    a3c5b23d  data/old_dataset.csv
+
+files summary: 1 modified, 1 deleted
+```
+
+### Compare with previous commit
+
+```bash
+dvc diff HEAD~1
+```
+
+```terminal
+Modified:
+    data/processed.csv
+
+files summary: 1 modified
+```
+
+### Show hashes
+
+Display hash values to track exact versions:
+
+```bash
+dvc diff --show-hash HEAD~2
+```
+
+```terminal
+Added:
+    d3b07384  models/model_v2.pkl
+
+Modified:
+    c157a790..f98bf6f1  data/features.csv
+
+files summary: 1 added, 1 modified
+```
+
+### Markdown output
+
+Generate a Markdown table (great for PRs):
+
+```bash
+dvc diff --md main experiment
+```
+
+```markdown
+| Status   | Path                    |
+|----------|-------------------------|
+| added    | models/new_model.pkl    |
+| modified | data/features.csv       |
+| deleted  | data/old_features.csv   |
+```
+
+With hashes:
+
+```bash
+dvc diff --md --show-hash
+```
+
+```markdown
+| Status   | Hash            | Path                  |
+|----------|-----------------|----------------------- |
+| added    | d3b07384        | models/model.pkl       |
+| modified | c157a790..f98b  | data/train.csv         |
+```
+
+### JSON output
+
+Get structured output for scripting:
+
+```bash
+dvc diff --json HEAD~1
+```
+
+```json
+{
+  "added": [
+    {
+      "path": "models/new_model.pkl",
+      "hash": "f98bf6f1d9e4c5e2a8b7c9d6e5f4a3b2"
+    }
+  ],
+  "modified": [
+    {
+      "path": "data/train.csv",
+      "hash": {
+        "old": "c157a79025e60bcf87d9e4f3c26b8a2f",
+        "new": "f98bf6f1d9e4c5e2a8b7c9d6e5f4a3b2"
+      }
+    }
+  ],
+  "deleted": [],
+  "renamed": []
+}
+```
+
+### Compare specific files
+
+Diff only specific tracked files:
+
+```bash
+dvc diff --targets data/train.csv data/test.csv
+```
+
+```terminal
+Modified:
+    data/train.csv
+
+files summary: 1 modified
+```
+
+### Compare release versions
+
+See what data changed between releases:
+
+```bash
+dvc diff v1.0 v2.0
+```
+
+```terminal
+Added:
+    models/enhanced_model.pkl
+    data/augmented/
+
+Modified:
+    data/train.csv
+
+Deleted:
+    models/baseline.pkl
+
+files summary: 2 added, 1 modified, 1 deleted
+```
+
+## Understanding the output
+
+### Status types
+
+| Status | Meaning |
+|--------|----------|
+| **Added** | File was created |
+| **Modified** | File content changed (hash changed) |
+| **Deleted** | File was removed |
+| **Renamed** | File was moved to a different path |
+| **Not in cache** | File is tracked but missing from cache |
+
+### Hash display
+
+- Single hash (e.g., `d3b07384`): Shows first 8 characters for added/deleted files
+- Hash range (e.g., `c157a790..f98bf6f1`): Shows old and new hash for modified files
+
+### Directory notation
+
+Directories are shown with a trailing slash:
+
+```terminal
+Added:
+    data/new_folder/
+```
+
+## Example workflows
+
+### Workflow 1: Review experiment changes
+
+```bash
+# Compare current experiment with main branch
+dvc diff main
+
+# Get detailed hash info
+dvc diff --show-hash main
+
+# Generate report for PR
+dvc diff --md main > experiment-changes.md
+```
+
+### Workflow 2: Track dataset evolution
+
+```bash
+# Compare with one week ago
+git log --since="1 week ago" --format="%H" | head -1 | xargs dvc diff
+
+# Or compare specific versions
+dvc diff v1.0 v2.0 --targets data/
+```
+
+### Workflow 3: Validate pipeline outputs
+
+```bash
+# Run pipeline
+dvc repro
+
+# Check what outputs changed
+dvc diff HEAD
+
+# If changes look good, commit
+git add dvc.lock *.dvc
+git commit -m "Update pipeline outputs"
+```
+
+### Workflow 4: Generate changelog
+
+```bash
+# Create a data changelog in Markdown
+echo "# Data Changes" > CHANGELOG.md
+echo "" >> CHANGELOG.md
+echo "## Version 2.0 vs 1.0" >> CHANGELOG.md
+dvc diff --md v1.0 v2.0 >> CHANGELOG.md
+```
+
+## Combining with Git workflow
+
+DVC diff works alongside Git:
+
+```bash
+# See code changes
+git diff main experiment
+
+# See data changes
+dvc diff main experiment
+
+# See both in one view
+git diff main experiment
+dvc diff main experiment
+```
+
+## Handling missing cache files
+
+By default, files not in cache are shown:
+
+```terminal
+Not in cache:
+    models/large_model.pkl
+```
+
+To hide these:
+
+```bash
+dvc diff --hide-missing
+```
+
+Or fetch them first:
+
+```bash
+dvc fetch --all-commits
+dvc diff
+```
+
+## Performance considerations
+
+<Tip>
+**Use targets** - Specify `--targets` to diff only specific files, making the operation faster for large projects.
+</Tip>
+
+<Tip>
+**Compare recent commits** - Comparing distant commits may be slower as DVC needs to reconstruct index state.
+</Tip>
+
+## Related commands
+
+- `dvc status` - Show current workspace status
+- `dvc metrics diff` - Compare metric values between commits
+- `dvc params diff` - Compare parameter values between commits
+- `dvc plots diff` - Compare and visualize plots

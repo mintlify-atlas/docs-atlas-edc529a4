@@ -1,122 +1,173 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "DVC",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#ed6334",
+    "light": "#14a6c1",
+    "dark": "#8355c6"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/c247de46-e684-419c-929d-40a3328be2b5.jpg",
+  "logo": {
+    "light": "https://media.brand.dev/09f3c671-c2cb-4206-8b55-9f8d09e37ada.svg",
+    "dark": "https://media.brand.dev/09f3c671-c2cb-4206-8b55-9f8d09e37ada.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/treeverse/dvc"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/treeverse/dvc",
+      "x": "https://twitter.com/DVCorg"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/data-versioning",
+              "concepts/pipelines",
+              "concepts/experiments",
+              "concepts/remote-storage"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "User Guide",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guide/tracking-data",
+              "guide/building-pipelines",
+              "guide/running-experiments",
+              "guide/remote-storage",
+              "guide/collaboration"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Configuration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "config/overview",
+              "config/dvc-files",
+              "config/remote-config"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Command Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "commands/overview"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Data Management",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "commands/add",
+              "commands/checkout",
+              "commands/commit",
+              "commands/status",
+              "commands/diff",
+              "commands/push",
+              "commands/pull",
+              "commands/fetch"
+            ]
+          },
+          {
+            "group": "Pipeline Commands",
+            "pages": [
+              "commands/stage",
+              "commands/run",
+              "commands/repro",
+              "commands/dag"
+            ]
+          },
+          {
+            "group": "Experiment Commands",
+            "pages": [
+              "commands/exp-run",
+              "commands/exp-show",
+              "commands/exp-diff",
+              "commands/exp-apply",
+              "commands/exp-branch",
+              "commands/exp-remove"
+            ]
+          },
+          {
+            "group": "Metrics & Params",
+            "pages": [
+              "commands/metrics",
+              "commands/params",
+              "commands/plots"
+            ]
+          },
+          {
+            "group": "Remote Storage",
+            "pages": [
+              "commands/remote",
+              "commands/cache"
+            ]
+          },
+          {
+            "group": "Other Commands",
+            "pages": [
+              "commands/init",
+              "commands/config",
+              "commands/version",
+              "commands/destroy"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python API",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "Data Access",
+            "pages": [
+              "api/open",
+              "api/read",
+              "api/get_url"
+            ]
+          },
+          {
+            "group": "Metadata",
+            "pages": [
+              "api/params_show",
+              "api/metrics_show",
+              "api/exp_show",
+              "api/artifacts_show"
+            ]
+          },
+          {
+            "group": "Filesystem",
+            "pages": [
+              "api/dvcfilesystem"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

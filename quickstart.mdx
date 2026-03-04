@@ -1,80 +1,607 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Tutorial
+description: Get up and running with DVC in 10 minutes — track data, build a pipeline, and push to remote storage
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This tutorial walks you through a complete DVC workflow:
+1. Initialize DVC in a Git repository
+2. Track datasets with version control
+3. Build a reproducible ML pipeline
+4. Set up remote storage and share data
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This tutorial takes about 10 minutes. You'll create a simple ML project that trains a model, tracks data and models, and pushes everything to remote storage.
 </Note>
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+<Steps>
+  <Step title="Install DVC">
+    Follow the [installation guide](/installation) to install DVC on your system.
+
+    ```bash
+    # Verify installation
+    dvc version
+    ```
+  </Step>
+
+  <Step title="Install Git">
+    DVC works with Git repositories. Make sure Git is installed:
+
+    ```bash
+    git --version
+    ```
+  </Step>
+
+  <Step title="Python Environment">
+    You'll need Python 3.9+ for this tutorial. We'll use basic Python scripts.
+  </Step>
+</Steps>
+
+## Step 1: Initialize a DVC Project
+
+Start by creating a new project and initializing Git and DVC:
+
+```bash
+# Create project directory
+mkdir ml-project
+cd ml-project
+
+# Initialize Git
+git init
+
+# Initialize DVC
+dvc init
+
+# Commit DVC configuration
+git commit -m "Initialize DVC"
+```
+
+<Accordion title="What just happened?">
+  The `dvc init` command created:
+  - `.dvc/` directory with configuration and cache
+  - `.dvc/.gitignore` to exclude cache from Git
+  - `.dvc/config` for DVC settings
+  - `.dvcignore` for files DVC should ignore
+
+  These files were automatically staged in Git. DVC stores configuration in Git but keeps data separate.
+</Accordion>
+
+<Info>
+  DVC has enabled anonymous usage analytics by default. This helps improve the tool. You can opt out anytime by running `dvc config core.analytics false`. See [analytics documentation](https://dvc.org/doc/user-guide/analytics) for details.
+</Info>
+
+## Step 2: Track Your First Dataset
+
+Let's create a sample dataset and track it with DVC:
+
+```bash
+# Create a data directory
+mkdir data
+
+# Create a sample dataset (or use your own)
+echo "feature1,feature2,label" > data/train.csv
+for i in {1..1000}; do
+  echo "$RANDOM,$RANDOM,$((RANDOM % 2))" >> data/train.csv
+done
+```
+
+Now track this file with DVC:
+
+```bash
+# Add the dataset to DVC
+dvc add data/train.csv
+```
+
+DVC created two new files:
+- `data/train.csv.dvc` — metadata file tracked by Git
+- `data/.gitignore` — tells Git to ignore the actual data file
+
+```bash
+# Check what DVC created
+cat data/train.csv.dvc
+```
+
+You'll see output like:
+
+```yaml
+outs:
+- md5: a3d0e7d8c6b5f4e3d2c1b0a9f8e7d6c5
+  size: 50000
+  hash: md5
+  path: train.csv
+```
+
+Commit the metadata to Git:
+
+```bash
+git add data/train.csv.dvc data/.gitignore
+git commit -m "Add training dataset"
+```
+
+<Tip>
+  The actual `data/train.csv` file is now in `.dvc/cache` (content-addressable storage) and linked to your workspace. Git only tracks the small `.dvc` file, keeping your repository lightweight.
+</Tip>
+
+## Step 3: Create Training Scripts
+
+Create simple training and preprocessing scripts:
+
+### Create `preprocess.py`
+
+```python preprocess.py
+import pandas as pd
+import json
+
+# Read raw data
+df = pd.read_csv('data/train.csv')
+
+# Simple preprocessing
+df['feature1_norm'] = (df['feature1'] - df['feature1'].mean()) / df['feature1'].std()
+df['feature2_norm'] = (df['feature2'] - df['feature2'].mean()) / df['feature2'].std()
+
+# Save processed data
+df.to_csv('data/processed.csv', index=False)
+
+print(f"Processed {len(df)} rows")
+```
+
+### Create `train.py`
+
+```python train.py
+import pandas as pd
+import json
+import pickle
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+
+# Load processed data
+df = pd.read_csv('data/processed.csv')
+X = df[['feature1_norm', 'feature2_norm']]
+y = df['label']
+
+# Train model
+model = LogisticRegression()
+model.fit(X, y)
+
+# Save model
+with open('model.pkl', 'wb') as f:
+    pickle.dump(model, f)
+
+# Calculate and save metrics
+predictions = model.predict(X)
+accuracy = accuracy_score(y, predictions)
+
+metrics = {'accuracy': accuracy}
+with open('metrics.json', 'w') as f:
+    json.dump(metrics, f)
+
+print(f"Model accuracy: {accuracy:.4f}")
+```
+
+### Install dependencies
+
+```bash
+pip install pandas scikit-learn
+```
+
+Commit your code:
+
+```bash
+git add preprocess.py train.py
+git commit -m "Add training scripts"
+```
+
+## Step 4: Build a DVC Pipeline
+
+Instead of running scripts manually, create a DVC pipeline that tracks dependencies:
+
+```bash
+# Add preprocessing stage
+dvc stage add -n preprocess \
+  -d data/train.csv \
+  -d preprocess.py \
+  -o data/processed.csv \
+  python preprocess.py
+
+# Add training stage
+dvc stage add -n train \
+  -d data/processed.csv \
+  -d train.py \
+  -o model.pkl \
+  -M metrics.json \
+  python train.py
+```
+
+<Accordion title="Understanding the flags">
+  - `-n` — Name of the stage
+  - `-d` — Dependencies (if any change, stage will rerun)
+  - `-o` — Outputs (tracked by DVC)
+  - `-M` — Metrics file (tracked but not cached)
+</Accordion>
+
+DVC created a `dvc.yaml` file defining your pipeline:
+
+```bash
+cat dvc.yaml
+```
+
+```yaml
+stages:
+  preprocess:
+    cmd: python preprocess.py
+    deps:
+    - data/train.csv
+    - preprocess.py
+    outs:
+    - data/processed.csv
+  train:
+    cmd: python train.py
+    deps:
+    - data/processed.csv
+    - train.py
+    outs:
+    - model.pkl
+    metrics:
+    - metrics.json:
+        cache: false
+```
+
+Commit the pipeline:
+
+```bash
+git add dvc.yaml dvc.lock .gitignore
+git commit -m "Create ML pipeline"
+```
+
+## Step 5: Run the Pipeline
+
+Execute your pipeline with a single command:
+
+```bash
+dvc repro
+```
+
+DVC will:
+1. Analyze dependencies
+2. Run stages in the correct order
+3. Track outputs
+4. Create `dvc.lock` with exact versions
+
+<Tip>
+  The `dvc.lock` file records exact hashes of all dependencies and outputs, ensuring reproducibility. Always commit it to Git.
+</Tip>
+
+Check your metrics:
+
+```bash
+dvc metrics show
+```
+
+Output:
+```
+Path          accuracy
+metrics.json  0.8723
+```
+
+## Step 6: Make Changes and Reproduce
+
+Let's modify the training script and see DVC's smart caching:
+
+```bash
+# Edit train.py to change model parameters
+# For example, change: LogisticRegression() -> LogisticRegression(C=0.5)
+
+# Reproduce the pipeline
+dvc repro
+```
+
+<Info>
+  DVC only reruns the `train` stage because `preprocess` hasn't changed. This saves time on long-running pipelines.
+</Info>
+
+Commit your changes:
+
+```bash
+git add train.py dvc.lock
+git commit -m "Update model parameters"
+```
+
+## Step 7: Set Up Remote Storage
+
+To share data with your team, configure remote storage. DVC supports many storage types:
+
+<Tabs>
+  <Tab title="Local Remote (for testing)">
+    ```bash
+    # Create a local "remote" directory
+    mkdir -p /tmp/dvc-storage
+
+    # Add it as a remote
+    dvc remote add -d myremote /tmp/dvc-storage
+
+    # Commit the configuration
+    git add .dvc/config
+    git commit -m "Configure local remote storage"
+    ```
+  </Tab>
+
+  <Tab title="AWS S3">
+    ```bash
+    # Add S3 remote
+    dvc remote add -d myremote s3://mybucket/dvcstore
+
+    # Configure credentials (optional, uses AWS CLI config by default)
+    dvc remote modify myremote access_key_id YOUR_ACCESS_KEY
+    dvc remote modify myremote secret_access_key YOUR_SECRET_KEY
+
+    git add .dvc/config
+    git commit -m "Configure S3 remote storage"
+    ```
+
+    <Note>
+      Install AWS dependencies: `pip install 'dvc[s3]'`
+    </Note>
+  </Tab>
+
+  <Tab title="Google Cloud Storage">
+    ```bash
+    # Add GCS remote
+    dvc remote add -d myremote gs://mybucket/dvcstore
+
+    # Authenticate with GCP
+    gcloud auth application-default login
+
+    git add .dvc/config
+    git commit -m "Configure GCS remote storage"
+    ```
+
+    <Note>
+      Install GCS dependencies: `pip install 'dvc[gs]'`
+    </Note>
+  </Tab>
+
+  <Tab title="Azure Blob Storage">
+    ```bash
+    # Add Azure remote
+    dvc remote add -d myremote azure://mycontainer/dvcstore
+
+    # Configure credentials
+    dvc remote modify myremote account_name YOUR_ACCOUNT
+    dvc remote modify myremote account_key YOUR_KEY
+
+    git add .dvc/config
+    git commit -m "Configure Azure remote storage"
+    ```
+
+    <Note>
+      Install Azure dependencies: `pip install 'dvc[azure]'`
+    </Note>
+  </Tab>
+
+  <Tab title="SSH/SFTP">
+    ```bash
+    # Add SSH remote
+    dvc remote add -d myremote ssh://user@example.com/path/to/dvc-storage
+
+    # Configure SSH key (optional)
+    dvc remote modify myremote keyfile ~/.ssh/id_rsa
+
+    git add .dvc/config
+    git commit -m "Configure SSH remote storage"
+    ```
+
+    <Note>
+      Install SSH dependencies: `pip install 'dvc[ssh]'`
+    </Note>
+  </Tab>
+</Tabs>
+
+<Accordion title="View remote configuration">
+  Check your `.dvc/config` file:
+
+  ```bash
+  cat .dvc/config
+  ```
+
+  Output:
+  ```ini
+  [core]
+      remote = myremote
+  ['remote "myremote"']
+      url = /tmp/dvc-storage
+  ```
+</Accordion>
+
+## Step 8: Push Data to Remote
+
+Upload your data and models to remote storage:
+
+```bash
+dvc push
+```
+
+DVC uploads:
+- `data/train.csv`
+- `data/processed.csv`  
+- `model.pkl`
+
+These files are now backed up and shareable.
+
+<Tip>
+  Push data after committing to Git so teammates can access data at any commit:
+  ```bash
+  git add . && git commit -m "Changes"
+  dvc push
+  git push
+  ```
+</Tip>
+
+## Step 9: Simulate Collaboration
+
+Let's see how a teammate would use your project:
+
+```bash
+# Clone repository (teammate's machine)
+cd /tmp
+git clone /path/to/ml-project ml-project-copy
+cd ml-project-copy
+
+# Pull data from remote
+dvc pull
+```
+
+Now all data and models are downloaded from remote storage. Your teammate can:
+- View the exact data you used
+- Reproduce your results with `dvc repro`
+- Make their own changes
+
+<Info>
+  The `dvc pull` command downloads data based on `.dvc` files in the current Git commit. This ensures everyone works with consistent data versions.
+</Info>
+
+## Step 10: Track Experiments
+
+DVC includes built-in experiment tracking:
+
+```bash
+# Run an experiment
+dvc exp run -n baseline
+
+# Modify hyperparameters in train.py
+# Run another experiment
+dvc exp run -n experiment-1
+
+# Compare experiments
+dvc exp show
+```
+
+Output:
+```
+┌────────────────────┬──────────┬───────┐
+│ Experiment         │ accuracy │ Model │
+├────────────────────┼──────────┼───────┤
+│ workspace          │ 0.8723   │ -     │
+│ baseline           │ 0.8723   │ model │
+│ experiment-1       │ 0.8845   │ model │
+└────────────────────┴──────────┴───────┘
+```
+
+<Tip>
+  Experiments are stored as Git commits that you can apply, compare, or branch from. Use `dvc exp apply` to restore an experiment to your workspace.
+</Tip>
+
+## Common Workflows
+
+### Updating Data
+
+When your dataset changes:
+
+```bash
+# Update the file
+echo "new,data,row" >> data/train.csv
+
+# Track the new version
+dvc add data/train.csv
+
+# Commit and push
+git add data/train.csv.dvc
+git commit -m "Update training data"
+dvc push
+```
+
+### Checking Status
+
+See what's changed:
+
+```bash
+# Check pipeline status
+dvc status
+
+# Check remote sync status
+dvc status --cloud
+```
+
+### Comparing Data Versions
+
+View differences between commits:
+
+```bash
+# Show what changed
+dvc diff
+
+# Compare specific commits
+dvc diff HEAD~1 HEAD
+```
+
+## What's Next?
+
+You've learned the core DVC workflow! Explore more:
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/concepts/data-versioning">
+    Deep dive into how DVC works internally.
+  </Card>
+  
+  <Card title="Command Reference" icon="terminal" href="/commands/overview">
+    Explore all available DVC commands.
+  </Card>
+  
+  <Card title="Building Pipelines" icon="diagram-project" href="/guide/building-pipelines">
+    Learn advanced pipeline features and best practices.
+  </Card>
+  
+  <Card title="Running Experiments" icon="flask" href="/guide/running-experiments">
+    Master experiment tracking and comparison.
+  </Card>
+  
+  <Card title="Remote Storage Guide" icon="cloud" href="/guide/remote-storage">
+    Configure and optimize remote storage.
+  </Card>
+  
+  <Card title="Python API" icon="python" href="/api/overview">
+    Use DVC programmatically in your scripts.
+  </Card>
+</CardGroup>
+
+## Summary
+
+In this tutorial, you:
+
+<Steps>
+  <Step title="Initialized DVC">
+    Set up DVC in a Git repository with `dvc init`
+  </Step>
+  
+  <Step title="Tracked Data">
+    Versioned datasets using `dvc add`
+  </Step>
+  
+  <Step title="Built a Pipeline">
+    Created reproducible stages with `dvc stage add`
+  </Step>
+  
+  <Step title="Ran the Pipeline">
+    Executed and reproduced results with `dvc repro`
+  </Step>
+  
+  <Step title="Configured Remote">
+    Set up remote storage with `dvc remote add`
+  </Step>
+  
+  <Step title="Shared Data">
+    Pushed data to remote with `dvc push`
+  </Step>
+  
+  <Step title="Collaborated">
+    Pulled data on another machine with `dvc pull`
+  </Step>
+</Steps>
+
+<Tip>
+  Join the [DVC community on Discord](https://dvc.org/chat) to ask questions, share projects, and learn from other users.
+</Tip>

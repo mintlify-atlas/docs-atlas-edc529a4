@@ -1,0 +1,391 @@
+---
+title: 'dvc plots'
+description: 'Commands to visualize and compare plot data'
+---
+
+## Description
+
+DVC plots commands generate interactive visualizations from your data files. These commands create HTML reports with charts and graphs to help you analyze model performance, training dynamics, and experiment results.
+
+## Subcommands
+
+### plots show
+
+Generate plots from target files or from `plots` definitions in `dvc.yaml`.
+
+<CodeGroup>
+```bash All Plots
+dvc plots show
+```
+
+```bash Specific Files
+dvc plots show training_history.csv confusion_matrix.json
+```
+
+```bash Custom Output Directory
+dvc plots show --out custom_plots/
+```
+
+```bash Auto-Open Browser
+dvc plots show --open
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="targets" type="list" optional>
+  Plots files or plot IDs from `dvc.yaml` to visualize. Shows all plots by default.
+</ParamField>
+
+#### Options
+
+<ParamField path="-t, --template" type="string" optional>
+  Special JSON or HTML schema file to inject with the data. See [plot templates](https://man.dvc.org/plots#plot-templates).
+</ParamField>
+
+<ParamField path="-x" type="string" optional>
+  Field name for X axis.
+</ParamField>
+
+<ParamField path="-y" type="string" optional>
+  Field name for Y axis.
+</ParamField>
+
+<ParamField path="--no-header" type="flag">
+  Provided CSV or TSV datafile does not have a header.
+</ParamField>
+
+<ParamField path="--title" type="string" optional>
+  Plot title.
+</ParamField>
+
+<ParamField path="--x-label" type="string" optional>
+  X axis label.
+</ParamField>
+
+<ParamField path="--y-label" type="string" optional>
+  Y axis label.
+</ParamField>
+
+<ParamField path="-o, --out" type="string" optional>
+  Directory to save plots to. Defaults to `dvc_plots`.
+</ParamField>
+
+<ParamField path="--show-vega" type="flag">
+  Show output in Vega format.
+</ParamField>
+
+<ParamField path="--open" type="flag">
+  Open plot file directly in the browser.
+</ParamField>
+
+<ParamField path="--html-template" type="string" optional>
+  Custom HTML template for VEGA visualization.
+</ParamField>
+
+---
+
+### plots diff
+
+Show multiple versions of a plot by overlaying them in a single image.
+
+<CodeGroup>
+```bash Compare Commits
+dvc plots diff HEAD~1 HEAD
+```
+
+```bash Compare Multiple Revisions
+dvc plots diff main feature-a feature-b
+```
+
+```bash Specific Plots
+dvc plots diff --targets training_loss.csv accuracy.json
+```
+
+```bash Custom Styling
+dvc plots diff -x epoch -y loss --title "Training Loss Comparison"
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="revisions" type="list" optional>
+  Git commits to plot from. Compares workspace with HEAD by default.
+</ParamField>
+
+#### Options
+
+<ParamField path="--targets" type="list" optional>
+  Specific plots to visualize. Accepts any file path or plot name from `dvc.yaml` file. Shows all tracked plots by default.
+</ParamField>
+
+<ParamField path="-t, --template" type="string" optional>
+  Special JSON or HTML schema file to inject with the data.
+</ParamField>
+
+<ParamField path="-x" type="string" optional>
+  Field name for X axis.
+</ParamField>
+
+<ParamField path="-y" type="string" optional>
+  Field name for Y axis.
+</ParamField>
+
+<ParamField path="--no-header" type="flag">
+  Provided CSV or TSV datafile does not have a header.
+</ParamField>
+
+<ParamField path="--title" type="string" optional>
+  Plot title.
+</ParamField>
+
+<ParamField path="--x-label" type="string" optional>
+  X axis label.
+</ParamField>
+
+<ParamField path="--y-label" type="string" optional>
+  Y axis label.
+</ParamField>
+
+<ParamField path="-o, --out" type="string" optional>
+  Directory to save plots to.
+</ParamField>
+
+<ParamField path="--open" type="flag">
+  Open plot file directly in the browser.
+</ParamField>
+
+<ParamField path="--html-template" type="string" optional>
+  Custom HTML template for VEGA visualization.
+</ParamField>
+
+---
+
+### plots modify
+
+Modify display properties of data-series plots defined in stages (has no effect on image plots).
+
+<CodeGroup>
+```bash Set X/Y Fields
+dvc plots modify training.csv -x epoch -y accuracy
+```
+
+```bash Set Template
+dvc plots modify results.json --template scatter
+```
+
+```bash Unset Properties
+dvc plots modify training.csv --unset x y
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="target" type="string" required>
+  Plots file to set properties for (defined at the stage level).
+</ParamField>
+
+#### Options
+
+<ParamField path="-t, --template" type="string" optional>
+  Plot template to use.
+</ParamField>
+
+<ParamField path="-x" type="string" optional>
+  Field name for X axis.
+</ParamField>
+
+<ParamField path="-y" type="string" optional>
+  Field name for Y axis.
+</ParamField>
+
+<ParamField path="--title" type="string" optional>
+  Plot title.
+</ParamField>
+
+<ParamField path="--x-label" type="string" optional>
+  X axis label.
+</ParamField>
+
+<ParamField path="--y-label" type="string" optional>
+  Y axis label.
+</ParamField>
+
+<ParamField path="--unset" type="list" optional>
+  Unset one or more display properties.
+</ParamField>
+
+---
+
+### plots templates
+
+List built-in plots templates or show JSON specification for one.
+
+<CodeGroup>
+```bash List All Templates
+dvc plots templates
+```
+
+```bash Show Template Specification
+dvc plots templates linear
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="template" type="string" optional>
+  Template for which to show JSON specification. List all template names by default.
+</ParamField>
+
+## Examples
+
+### Visualizing Training Metrics
+
+```bash
+# Generate plots for training history
+dvc plots show training_history.csv -x epoch -y loss --title "Training Loss"
+```
+
+This creates an HTML file with an interactive line chart showing loss over epochs.
+
+### Comparing Model Versions
+
+```bash
+# Compare plots across different model versions
+dvc plots diff v1.0 v2.0 v3.0 --targets metrics/accuracy.csv
+```
+
+Creates overlaid plots showing how accuracy evolved across three model versions.
+
+### Custom Plot Configuration
+
+```bash
+# Create scatter plot with custom labels
+dvc plots show results.csv \
+  -x learning_rate \
+  -y accuracy \
+  --title "Hyperparameter Tuning Results" \
+  --x-label "Learning Rate" \
+  --y-label "Model Accuracy"
+```
+
+### Auto-Open in Browser
+
+```bash
+# Generate and immediately view plots
+dvc plots show --open
+```
+
+<Tip>
+Enable auto-open permanently with: `dvc config plots.auto_open true`
+</Tip>
+
+## Supported Data Formats
+
+<AccordionGroup>
+  <Accordion title="CSV" icon="table">
+    ```csv training.csv
+    epoch,loss,accuracy
+    1,0.8234,0.6543
+    2,0.5123,0.7654
+    3,0.3456,0.8123
+    ```
+  </Accordion>
+
+  <Accordion title="JSON" icon="brackets-curly">
+    ```json metrics.json
+    [
+      {"epoch": 1, "loss": 0.8234, "accuracy": 0.6543},
+      {"epoch": 2, "loss": 0.5123, "accuracy": 0.7654},
+      {"epoch": 3, "loss": 0.3456, "accuracy": 0.8123}
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="TSV" icon="table-cells">
+    ```tsv data.tsv
+    step	precision	recall
+    100	0.85	0.82
+    200	0.89	0.87
+    300	0.92	0.91
+    ```
+  </Accordion>
+
+  <Accordion title="Images" icon="image">
+    DVC plots also supports image files (PNG, JPEG, SVG) for displaying confusion matrices, visualizations, and other graphics.
+  </Accordion>
+</AccordionGroup>
+
+## Built-in Templates
+
+<CardGroup cols={3}>
+  <Card title="Linear" icon="chart-line">
+    Line plot for time series data
+  </Card>
+  
+  <Card title="Scatter" icon="chart-scatter">
+    Scatter plot for correlation analysis
+  </Card>
+  
+  <Card title="Smooth" icon="wave-sine">
+    Smoothed line plot
+  </Card>
+  
+  <Card title="Confusion" icon="table-cells">
+    Confusion matrix heatmap
+  </Card>
+  
+  <Card title="Bar" icon="chart-bar">
+    Bar chart for categorical data
+  </Card>
+  
+  <Card title="Custom" icon="paintbrush">
+    Bring your own Vega-Lite spec
+  </Card>
+</CardGroup>
+
+## Output Structure
+
+When you run `dvc plots show`, DVC creates:
+
+```
+dvc_plots/
+├── index.html          # Main visualization page
+└── static/
+    ├── data/           # Plot data files
+    └── vega/           # Vega specifications
+```
+
+<Note>
+The output directory can be customized with `-o, --out` option or by setting `plots.out_dir` in DVC config.
+</Note>
+
+<Warning>
+Plot files must be tracked by DVC (in `dvc.yaml` or `.dvc` files) to be included in `dvc plots diff`.
+</Warning>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Training Monitoring" icon="chart-line">
+    Visualize loss curves, accuracy trends, and other training metrics over time.
+  </Card>
+  
+  <Card title="Model Comparison" icon="code-compare">
+    Compare performance metrics across different model architectures or hyperparameters.
+  </Card>
+  
+  <Card title="A/B Testing" icon="flask">
+    Visualize differences between control and experimental model versions.
+  </Card>
+  
+  <Card title="Performance Analysis" icon="magnifying-glass-chart">
+    Create confusion matrices, ROC curves, and precision-recall plots.
+  </Card>
+</CardGroup>
+
+## Related Commands
+
+- `dvc metrics` - Display metrics in tabular format
+- `dvc params` - Track parameter changes
+- `dvc exp show` - Show experiments with metrics and params

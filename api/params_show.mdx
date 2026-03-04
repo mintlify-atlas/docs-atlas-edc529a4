@@ -1,0 +1,568 @@
+---
+title: 'dvc.api.params_show()'
+description: 'Retrieve parameters from DVC-tracked parameter files programmatically'
+icon: 'sliders'
+---
+
+<Note>
+Source: [dvc/api/show.py:156-404](~/workspace/source/dvc/api/show.py)
+</Note>
+
+## Description
+
+Retrieve parameters tracked in a DVC repository. Without arguments, this function retrieves all parameters from all tracked parameter files for the current working tree.
+
+Parameters are typically stored in YAML, JSON, TOML, or Python files and tracked in `dvc.yaml`. This function provides programmatic access to these parameters for analysis, comparison, or dynamic configuration.
+
+## Signature
+
+```python
+dvc.api.params_show(
+    *targets: str,
+    repo: Optional[str] = None,
+    stages: Optional[Union[str, Iterable[str]]] = None,
+    rev: Optional[str] = None,
+    deps: bool = False,
+    config: Optional[dict] = None,
+) -> dict
+```
+
+## Parameters
+
+<ParamField path="*targets" type="str" default="None">
+  Names of the parameter files to retrieve parameters from (positional arguments).
+  
+  - If no targets are provided, all parameter files tracked in `dvc.yaml` will be used
+  - Targets don't necessarily have to be defined in `dvc.yaml`
+  - Can specify multiple files: `params_show("params.yaml", "config.toml")`
+  
+  ```python
+  # Single target
+  params = dvc.api.params_show("params.yaml")
+  
+  # Multiple targets
+  params = dvc.api.params_show("params.yaml", "config.json")
+  
+  # No targets (all params)
+  params = dvc.api.params_show()
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository.
+  
+  - Defaults to the current project (found by walking up from the current working directory)
+  - Can be a URL or a file system path
+  - Both HTTP and SSH protocols are supported for online Git repos
+  
+  ```python
+  repo="https://github.com/iterative/example-get-started"
+  repo="git@server.com:user/project.git"
+  repo="/path/to/local/repo"
+  ```
+</ParamField>
+
+<ParamField path="stages" type="Union[str, Iterable[str]]" default="None">
+  Name or names of the stages to retrieve parameters from.
+  
+  - If `None`, all parameters from all stages will be retrieved
+  - Can be a single string or an iterable of strings
+  - If called from a different location than `dvc.yaml`, use: `{relpath}:{stage}`
+  
+  ```python
+  stages="train"                          # Single stage
+  stages=["prepare", "train", "evaluate"] # Multiple stages
+  stages="subdir/dvc.yaml:train"          # Stage in subdirectory
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Name of the Git revision to retrieve parameters from.
+  
+  - Defaults to `None` (current working tree)
+  - Can be a branch name, tag name, commit hash, or DVC experiment name
+  - If `repo` is not a Git repo, this option is ignored
+  
+  ```python
+  rev="main"
+  rev="v1.0.0"
+  rev="abc123"
+  rev="exp-tuned-hyperparams"
+  ```
+</ParamField>
+
+<ParamField path="deps" type="bool" default="False">
+  Whether to retrieve only parameters that are stage dependencies.
+  
+  - When `True`, only returns parameters explicitly listed as dependencies
+  - When `False`, returns all parameters
+  
+  ```python
+  # Get only dependency parameters
+  params = dvc.api.params_show(deps=True)
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  Config dictionary to be passed through to the DVC project.
+  
+  ```python
+  config={"cache": {"dir": "/tmp/cache"}}
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="parameters" type="dict">
+  A dictionary containing the parameters. The structure depends on the parameter files:
+  
+  - **Single file**: Returns the parameters directly
+  - **Multiple files with unique keys**: Merges parameters from all files
+  - **Multiple files with conflicting keys**: Prefixes keys with `filename:key`
+  
+  ```python
+  # Example return value
+  {
+      "prepare": {
+          "split": 0.2,
+          "seed": 20170428
+      },
+      "train": {
+          "n_est": 50,
+          "min_split": 0.01
+      }
+  }
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Usage - All Parameters
+
+```python
+import dvc.api
+import json
+
+# Get all parameters from current working tree
+params = dvc.api.params_show()
+print(json.dumps(params, indent=2))
+```
+
+```json
+{
+  "prepare": {
+    "split": 0.2,
+    "seed": 20170428
+  },
+  "featurize": {
+    "max_features": 200,
+    "ngrams": 2
+  },
+  "train": {
+    "seed": 20170428,
+    "n_est": 50,
+    "min_split": 0.01
+  }
+}
+```
+
+### From Specific Git Revision
+
+```python
+import dvc.api
+
+# Get parameters from a branch
+params_main = dvc.api.params_show(rev="main")
+params_dev = dvc.api.params_show(rev="development")
+
+print(f"Main branch learning rate: {params_main['train']['lr']}")
+print(f"Dev branch learning rate: {params_dev['train']['lr']}")
+```
+
+### Filter by Stages
+
+```python
+import dvc.api
+
+# Get parameters for a single stage
+train_params = dvc.api.params_show(stages="train")
+print(train_params)
+# {"train": {"seed": 20170428, "n_est": 50, "min_split": 0.01}}
+
+# Get parameters for multiple stages
+params = dvc.api.params_show(stages=["prepare", "train"])
+print(params)
+# {"prepare": {...}, "train": {...}}
+```
+
+### Specific Parameter Files
+
+```python
+import dvc.api
+
+# Get parameters from specific file
+params = dvc.api.params_show("params.yaml")
+print(params)
+
+# Get parameters from multiple files
+params = dvc.api.params_show(
+    "configs/params_dev.yaml",
+    "configs/params_prod.yaml"
+)
+print(params)
+```
+
+### Remote Repository
+
+```python
+import dvc.api
+
+# Get parameters from remote repo
+params = dvc.api.params_show(
+    repo="https://github.com/iterative/example-get-started"
+)
+print(params)
+```
+
+### Compare Parameters Across Branches
+
+```python
+import dvc.api
+
+branches = ["main", "experiment-1", "experiment-2"]
+comparison = {}
+
+for branch in branches:
+    params = dvc.api.params_show(rev=branch)
+    comparison[branch] = params.get("train", {})
+
+print("Learning Rate Comparison:")
+for branch, params in comparison.items():
+    lr = params.get("lr", "N/A")
+    print(f"  {branch}: {lr}")
+```
+
+### Access Nested Parameters
+
+```python
+import dvc.api
+
+params = dvc.api.params_show()
+
+# Access nested values
+learning_rate = params["train"]["lr"]
+epochs = params["train"]["epochs"]
+batch_size = params["train"]["batch_size"]
+
+print(f"Training with lr={learning_rate}, epochs={epochs}, batch={batch_size}")
+```
+
+### Handle Multiple Files with Conflicts
+
+```python
+import dvc.api
+
+# When multiple files have the same parameter keys,
+# they are prefixed with filename
+params = dvc.api.params_show(
+    "configs/params_dev.yaml",
+    "configs/params_prod.yaml"
+)
+
+print(params)
+# {
+#   "configs/params_prod.yaml:lr": 0.001,
+#   "configs/params_dev.yaml:lr": 0.01,
+#   ...
+# }
+```
+
+### Load Parameters for Training
+
+```python
+import dvc.api
+
+# Load hyperparameters from DVC
+params = dvc.api.params_show(stages="train")
+train_config = params.get("train", {})
+
+# Use in training script
+model = create_model(
+    learning_rate=train_config["lr"],
+    epochs=train_config["epochs"],
+    batch_size=train_config["batch_size"]
+)
+```
+
+### Get Only Dependency Parameters
+
+```python
+import dvc.api
+
+# Get only parameters that are stage dependencies
+dep_params = dvc.api.params_show(deps=True)
+print(dep_params)
+```
+
+### Error Handling
+
+```python
+import dvc.api
+
+try:
+    params = dvc.api.params_show(
+        "params.yaml",
+        repo="https://github.com/user/repo",
+        rev="main"
+    )
+    print(params)
+except FileNotFoundError:
+    print("Parameters file not found")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Hyperparameter Tracking" icon="chart-line">
+  Track and compare hyperparameters across experiments and branches.
+</Card>
+
+<Card title="Dynamic Configuration" icon="gear">
+  Load parameters programmatically in training and inference scripts.
+</Card>
+
+<Card title="Experiment Comparison" icon="flask">
+  Compare parameter settings across different experiments.
+</Card>
+
+<Card title="Reproducibility" icon="rotate">
+  Retrieve exact parameters used in past experiments for reproduction.
+</Card>
+
+</CardGroup>
+
+## Parameter File Formats
+
+<Tabs>
+  <Tab title="YAML">
+    ```yaml
+    # params.yaml
+    train:
+      lr: 0.001
+      epochs: 10
+      batch_size: 32
+    
+    model:
+      hidden_units: 128
+      dropout: 0.2
+    ```
+    
+    ```python
+    params = dvc.api.params_show("params.yaml")
+    print(params["train"]["lr"])  # 0.001
+    ```
+  </Tab>
+  
+  <Tab title="JSON">
+    ```json
+    {
+      "train": {
+        "lr": 0.001,
+        "epochs": 10
+      }
+    }
+    ```
+    
+    ```python
+    params = dvc.api.params_show("params.json")
+    print(params["train"]["epochs"])  # 10
+    ```
+  </Tab>
+  
+  <Tab title="TOML">
+    ```toml
+    [train]
+    lr = 0.001
+    epochs = 10
+    
+    [model]
+    hidden_units = 128
+    ```
+    
+    ```python
+    params = dvc.api.params_show("params.toml")
+    print(params["model"]["hidden_units"])  # 128
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    # params.py
+    LEARNING_RATE = 0.001
+    EPOCHS = 10
+    
+    MODEL_CONFIG = {
+        "hidden_units": 128,
+        "dropout": 0.2
+    }
+    ```
+    
+    ```python
+    params = dvc.api.params_show("params.py")
+    print(params["LEARNING_RATE"])  # 0.001
+    ```
+  </Tab>
+</Tabs>
+
+## Return Value Structure
+
+<AccordionGroup>
+
+<Accordion title="Single parameter file">
+  When retrieving parameters from a single file, the structure matches the file content:
+  
+  ```python
+  params = dvc.api.params_show("params.yaml")
+  # {
+  #   "train": {"lr": 0.001, "epochs": 10},
+  #   "model": {"units": 128}
+  # }
+  ```
+</Accordion>
+
+<Accordion title="Multiple files (unique keys)">
+  When parameter keys are unique across files, they're merged:
+  
+  ```python
+  params = dvc.api.params_show("train_params.yaml", "model_params.yaml")
+  # {
+  #   "train": {"lr": 0.001},  # from train_params.yaml
+  #   "model": {"units": 128}   # from model_params.yaml
+  # }
+  ```
+</Accordion>
+
+<Accordion title="Multiple files (conflicting keys)">
+  When keys conflict, they're prefixed with the filename:
+  
+  ```python
+  params = dvc.api.params_show("dev_params.yaml", "prod_params.yaml")
+  # {
+  #   "dev_params.yaml:lr": 0.01,
+  #   "prod_params.yaml:lr": 0.001
+  # }
+  ```
+</Accordion>
+
+<Accordion title="Stage filtering">
+  When filtering by stages, only parameters used by those stages are returned:
+  
+  ```python
+  params = dvc.api.params_show(stages="train")
+  # {
+  #   "train": {"lr": 0.001, "epochs": 10}
+  # }
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Version control parameters">
+  Store parameters in version control and track with DVC:
+  
+  ```yaml
+  # params.yaml (in Git)
+  train:
+    lr: 0.001
+    epochs: 10
+  ```
+  
+  ```yaml
+  # dvc.yaml
+  stages:
+    train:
+      cmd: python train.py
+      params:
+        - params.yaml:train
+  ```
+</Accordion>
+
+<Accordion title="Use for reproducibility">
+  Retrieve exact parameters for reproducing results:
+  
+  ```python
+  import dvc.api
+  
+  # Get parameters from successful experiment
+  params = dvc.api.params_show(
+      rev="exp-best-model",
+      stages="train"
+  )
+  
+  # Reproduce training with same parameters
+  train_model(**params["train"])
+  ```
+</Accordion>
+
+<Accordion title="Compare across experiments">
+  Build parameter comparison tools:
+  
+  ```python
+  import dvc.api
+  import pandas as pd
+  
+  experiments = ["exp-1", "exp-2", "exp-3"]
+  param_comparison = []
+  
+  for exp in experiments:
+      params = dvc.api.params_show(rev=exp)
+      param_comparison.append({
+          "experiment": exp,
+          **params.get("train", {})
+      })
+  
+  df = pd.DataFrame(param_comparison)
+  print(df)
+  ```
+</Accordion>
+
+<Accordion title="Handle missing parameters gracefully">
+  Use `.get()` with defaults for robustness:
+  
+  ```python
+  import dvc.api
+  
+  params = dvc.api.params_show()
+  
+  # Safe access with defaults
+  lr = params.get("train", {}).get("lr", 0.001)
+  epochs = params.get("train", {}).get("epochs", 10)
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="metrics_show()" icon="chart-line" href="/api/metrics_show">
+  Retrieve metrics values
+</Card>
+
+<Card title="exp_show()" icon="flask" href="/api/exp_show">
+  Show experiments with params
+</Card>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read any tracked file
+</Card>
+
+</CardGroup>

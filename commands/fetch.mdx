@@ -1,0 +1,440 @@
+---
+title: dvc fetch
+description: Download files or directories from remote storage to the cache
+---
+
+## Synopsis
+
+```bash
+dvc fetch [options] [<targets>...]
+```
+
+## Description
+
+The `dvc fetch` command downloads DVC-tracked files from remote storage to your local cache **without** updating your workspace. It's one part of what `dvc pull` does (the other being `dvc checkout`).
+
+Use `dvc fetch` when you want to:
+
+- Pre-download data without immediately checking it out
+- Prepare cache for multiple branch checkouts
+- Download data for later use
+- Populate a shared cache location
+- Backup all remote data locally
+
+Unlike `dvc pull`, which both downloads and updates workspace files, `dvc fetch` only populates the cache. To make the files available in your workspace, you need to run `dvc checkout` afterward.
+
+<Info>
+Think of `dvc fetch` like `git fetch` - it downloads data but doesn't change your working directory. Use `dvc pull` (like `git pull`) if you want to download and update your workspace in one step.
+</Info>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names. If not specified, fetches all tracked data.
+  
+  ```bash
+  dvc fetch data/train.csv models/
+  ```
+</ParamField>
+
+<ParamField path="-r, --remote" type="string">
+  Remote storage to fetch from. If not specified, uses the default remote configured in `.dvc/config`.
+  
+  ```bash
+  dvc fetch --remote s3storage
+  ```
+</ParamField>
+
+<ParamField path="-j, --jobs" type="integer" default="4 * cpu_count()">
+  Number of jobs to run simultaneously. Higher values increase parallelism but use more resources.
+  
+  ```bash
+  dvc fetch --jobs 16
+  ```
+</ParamField>
+
+<ParamField path="-a, --all-branches" type="boolean" default="false">
+  Fetch cache for all Git branches. Downloads data for every branch in the repository.
+  
+  ```bash
+  dvc fetch --all-branches
+  ```
+  
+  <Tip>
+  Useful for populating a shared cache or preparing for rapid branch switching.
+  </Tip>
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="boolean" default="false">
+  Fetch cache for all Git tags.
+  
+  ```bash
+  dvc fetch --all-tags
+  ```
+</ParamField>
+
+<ParamField path="-A, --all-commits" type="boolean" default="false">
+  Fetch cache for all Git commits.
+  
+  <Warning>
+  This can download a massive amount of data. Use only when you need complete history.
+  </Warning>
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Fetch cache for all dependencies of the specified target.
+  
+  ```bash
+  dvc fetch --with-deps evaluate.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Fetch cache for subdirectories of the specified directory.
+  
+  ```bash
+  dvc fetch --recursive experiments/
+  ```
+</ParamField>
+
+<ParamField path="--run-cache" type="boolean" default="false">
+  Fetch run history for all stages.
+  
+  ```bash
+  dvc fetch --run-cache
+  ```
+</ParamField>
+
+<ParamField path="--max-size" type="integer">
+  Fetch only files/directories that are each below specified size in bytes.
+  
+  ```bash
+  # Fetch only files smaller than 100MB
+  dvc fetch --max-size 104857600
+  ```
+  
+  <Info>
+  Useful for CI/CD environments with limited storage or bandwidth.
+  </Info>
+</ParamField>
+
+<ParamField path="--type" type="string[]">
+  Only fetch data files/directories that are of a particular type. Can specify multiple times.
+  
+  Choices: `metrics`, `plots`
+  
+  ```bash
+  dvc fetch --type metrics --type plots
+  ```
+</ParamField>
+
+## Examples
+
+### Basic fetch
+
+Fetch all tracked data to local cache:
+
+```bash
+dvc fetch
+```
+
+```terminal
+3 files fetched
+```
+
+Or if cache is up to date:
+
+```terminal
+Everything is up to date.
+```
+
+### Fetch then checkout
+
+The two-step equivalent of `dvc pull`:
+
+```bash
+# Download to cache
+dvc fetch
+
+# Update workspace
+dvc checkout
+```
+
+### Fetch specific files
+
+Fetch only specific targets:
+
+```bash
+dvc fetch data/train.csv.dvc models/model.pkl.dvc
+```
+
+```terminal
+2 files fetched
+```
+
+### Fetch from specific remote
+
+```bash
+dvc fetch --remote backup-storage
+```
+
+### Fetch all branches
+
+Download data for all branches (great for shared caches):
+
+```bash
+dvc fetch --all-branches
+```
+
+```terminal
+main:
+        2 files fetched
+experiment-1:
+        3 files fetched
+experiment-2:
+        1 file fetched
+        
+Total: 6 files fetched
+```
+
+### Fetch with dependencies
+
+Fetch a pipeline stage and all its dependencies:
+
+```bash
+dvc fetch --with-deps train.dvc
+```
+
+### Fetch small files only
+
+Fetch only files under 50MB:
+
+```bash
+dvc fetch --max-size 52428800
+```
+
+<Tip>
+Useful in CI/CD to skip large model files when only running unit tests.
+</Tip>
+
+### Fetch only metrics and plots
+
+```bash
+dvc fetch --type metrics --type plots
+```
+
+### Parallel fetch
+
+Speed up with more jobs:
+
+```bash
+dvc fetch --jobs 16
+```
+
+## Example workflows
+
+### Workflow 1: Shared cache setup
+
+Set up a shared cache for your team:
+
+```bash
+# On shared server/machine
+cd /shared/ml-project
+
+# Fetch all data for all branches
+dvc fetch --all-branches
+
+# Configure team members to use this cache
+# In each member's workspace:
+dvc cache dir /shared/ml-project/.dvc/cache
+```
+
+### Workflow 2: Branch switching optimization
+
+Pre-fetch data for branches you'll be working on:
+
+```bash
+# Fetch data for multiple branches
+dvc fetch --all-branches
+
+# Now you can switch branches quickly
+git checkout experiment-1
+dvc checkout  # Fast - already in cache
+
+git checkout experiment-2
+dvc checkout  # Also fast
+```
+
+### Workflow 3: CI/CD with selective fetch
+
+```bash
+#!/bin/bash
+# ci-test.sh
+
+# Clone repo
+git clone $REPO_URL
+cd project
+
+# Fetch only small test files
+dvc fetch --type metrics data/test-sample.csv.dvc
+
+# Checkout to workspace
+dvc checkout
+
+# Run tests
+pytest tests/
+```
+
+### Workflow 4: Disaster recovery
+
+Backup remote storage to local:
+
+```bash
+# Fetch everything from remote
+dvc fetch --all-branches --all-tags --run-cache
+
+# Now local cache has complete backup
+# Can re-upload to a different remote if needed
+dvc remote add new-backup s3://backup-bucket/
+dvc push --remote new-backup --all-branches --all-tags
+```
+
+### Workflow 5: Prepare for offline work
+
+```bash
+# Before losing internet connection
+dvc fetch --all-branches
+
+# Later, offline:
+git checkout feature-branch
+dvc checkout  # Works - data in cache
+
+git checkout main
+dvc checkout  # Also works
+```
+
+## Understanding fetch vs pull vs checkout
+
+| Command | Downloads from remote | Updates workspace | Use case |
+|---------|----------------------|-------------------|----------|
+| `dvc fetch` | ✓ | ✗ | Pre-download data |
+| `dvc checkout` | ✗ | ✓ | Update workspace from cache |
+| `dvc pull` | ✓ | ✓ | Download and update |
+
+### Visual flow
+
+```
+Remote Storage → [dvc fetch] → Local Cache → [dvc checkout] → Workspace
+
+Remote Storage → [dvc pull] → Local Cache → Workspace
+                               (does both)
+```
+
+## Example comparison
+
+### Using fetch + checkout:
+
+```bash
+dvc fetch    # Downloads to cache
+ls data/     # Files not yet in workspace
+dvc checkout # Now files appear in workspace
+ls data/     # Files now visible
+```
+
+### Using pull:
+
+```bash
+dvc pull     # Downloads to cache AND workspace
+ls data/     # Files immediately visible
+```
+
+## When to use fetch instead of pull
+
+<Tip>
+**Use `dvc fetch` when:**
+
+- Setting up shared cache
+- Pre-downloading for multiple branches
+- Populating cache for CI/CD
+- You want to review what will be checked out before doing it
+- Working in a script that separates download and checkout steps
+</Tip>
+
+<Tip>
+**Use `dvc pull` when:**
+
+- You want data immediately in workspace
+- Doing regular development work
+- Simplicity is more important than control
+- You're syncing after git pull
+</Tip>
+
+## Performance tips
+
+<Tip>
+**Maximize parallelism** - Use more jobs for faster downloads:
+```bash
+dvc fetch --jobs 32
+```
+</Tip>
+
+<Tip>
+**Fetch selectively** - Use filters to avoid downloading unnecessary data:
+```bash
+dvc fetch --type metrics --max-size 10485760
+```
+</Tip>
+
+<Tip>
+**Use shared cache** - Configure a shared cache directory to avoid duplicate downloads across team members:
+```bash
+dvc cache dir /shared/cache
+```
+</Tip>
+
+<Tip>
+**Fetch overnight** - For large datasets, fetch all branches overnight:
+```bash
+nohup dvc fetch --all-branches &
+```
+</Tip>
+
+## Error handling
+
+### Missing remote
+
+```terminal
+ERROR: no remote provided and no default remote set
+```
+
+**Solution**: Configure a remote:
+```bash
+dvc remote add -d origin <remote-url>
+```
+
+### Authentication errors
+
+```terminal
+ERROR: failed to fetch data from the cloud
+```
+
+**Solution**: Set up credentials for your storage backend.
+
+### Disk space issues
+
+```terminal
+ERROR: not enough disk space
+```
+
+**Solution**: Either:
+1. Free up space
+2. Use `--max-size` to limit what's fetched
+3. Use `--type` to fetch only specific file types
+
+## Related commands
+
+- `dvc pull` - Fetch and checkout in one command
+- `dvc push` - Upload data to remote storage
+- `dvc checkout` - Update workspace from cache
+- `dvc status` - Check sync status with remote
+- `dvc cache` - Manage local cache

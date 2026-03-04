@@ -1,0 +1,236 @@
+---
+title: Introduction to DVC
+description: Learn what DVC is, its key features, and why it's essential for machine learning projects
+---
+
+## What is DVC?
+
+**Data Version Control** (DVC) is a command-line tool and VS Code extension designed to help you develop reproducible machine learning projects. Think of it as "Git for data" — it brings version control capabilities to large files, datasets, and ML models while leveraging Git for code and pipeline tracking.
+
+<Info>
+  DVC is an open-source tool distributed under the Apache 2.0 license, maintained by Iterative and used by thousands of ML practitioners worldwide.
+</Info>
+
+## Why Use DVC?
+
+Machine learning projects face unique challenges that traditional version control systems weren't designed to handle:
+
+<CardGroup cols={2}>
+  <Card title="Data is Too Large for Git" icon="database">
+    Datasets often exceed gigabytes or terabytes, making them impractical to store in Git repositories.
+  </Card>
+  
+  <Card title="Models Need Versioning" icon="cube">
+    ML models are binary artifacts that evolve through experimentation and need proper version tracking.
+  </Card>
+  
+  <Card title="Reproducibility is Critical" icon="arrows-rotate">
+    You need to reproduce any experiment, model, or result from any point in your project's history.
+  </Card>
+  
+  <Card title="Collaboration is Complex" icon="users">
+    Teams need to share large datasets and models without bloating repositories or manual file transfers.
+  </Card>
+</CardGroup>
+
+DVC solves these problems by providing Git-like workflows for data and models while keeping your repository lightweight.
+
+## Core Features
+
+### 1. Version Your Data and Models
+
+DVC stores version information about your data in Git, while the actual files live in a cache or remote storage.
+
+```bash
+# Track a dataset with DVC
+dvc add data/train.csv
+
+# Git tracks only the metadata
+git add data/train.csv.dvc data/.gitignore
+git commit -m "Add training data v1"
+```
+
+<Note>
+  When you run `dvc add`, DVC creates a `.dvc` file containing metadata (like a hash of your data) and adds the actual data file to `.gitignore`. This keeps your Git repository clean while maintaining full version control.
+</Note>
+
+### 2. Build Reproducible Pipelines
+
+DVC pipelines connect your code and data into a computational graph, tracking dependencies and outputs.
+
+```bash
+# Create a preprocessing stage
+dvc stage add -n preprocess \
+  -d data/raw.csv \
+  -o data/processed.csv \
+  python preprocess.py
+
+# Create a training stage
+dvc stage add -n train \
+  -d data/processed.csv \
+  -d train.py \
+  -o models/model.pkl \
+  -M metrics.json \
+  python train.py
+```
+
+DVC only reruns stages when their dependencies change, making your workflows efficient and reproducible.
+
+### 3. Track Experiments Locally
+
+Run and compare multiple experiments without servers or external tools.
+
+```bash
+# Run an experiment
+dvc exp run -n baseline
+
+# Modify hyperparameters and run again
+dvc exp run -n experiment-1
+
+# Compare all experiments
+dvc exp show
+```
+
+<Tip>
+  DVC stores experiment information in your local Git repository, so you don't need any external experiment tracking server. Share experiments by sharing Git commits.
+</Tip>
+
+### 4. Share Data Seamlessly
+
+Configure remote storage once, then push and pull data like you do with Git.
+
+```bash
+# Add remote storage (S3, Azure, GCS, SSH, etc.)
+dvc remote add -d storage s3://mybucket/dvcstore
+
+# Push data to remote
+dvc push
+
+# Teammates can pull your data
+dvc pull
+```
+
+## How DVC Works
+
+DVC uses three key concepts to enable data version control:
+
+<Steps>
+  <Step title="Git for Metadata">
+    DVC stores lightweight `.dvc` files in Git that contain metadata about your data (file hashes, locations, dependencies).
+  </Step>
+  
+  <Step title="Cache for Data">
+    Actual data files are stored in a local `.dvc/cache` directory using content-addressable storage (files are named by their hash).
+  </Step>
+  
+  <Step title="Remote for Sharing">
+    To collaborate, DVC can push/pull data files to/from remote storage (S3, Azure Blob, Google Cloud Storage, SSH servers, etc.).
+  </Step>
+</Steps>
+
+<Frame>
+  <img src="https://dvc.org/img/flow.gif" alt="DVC workflow diagram" />
+</Frame>
+
+This architecture means:
+- Your Git repository stays lightweight (only metadata)
+- Data is deduplicated automatically
+- You can work offline with cached data
+- Remote storage is flexible and cost-effective
+
+## Key Analogies
+
+If you're familiar with other tools, here's how DVC compares:
+
+<AccordionGroup>
+  <Accordion title="Git for Data" icon="git">
+    Like Git-LFS but without requiring a special server. DVC works with any cloud storage or SSH server, and integrates seamlessly with your Git workflow.
+  </Accordion>
+  
+  <Accordion title="Makefiles for ML" icon="gears">
+    DVC pipelines are like Makefiles for machine learning. They describe how data and model artifacts are built from code and other data, with automatic dependency tracking.
+  </Accordion>
+  
+  <Accordion title="Local Experiment Tracking" icon="flask">
+    Instead of MLflow or Weights & Biases servers, DVC turns your machine into an experiment management platform using Git as the backend.
+  </Accordion>
+</AccordionGroup>
+
+## What DVC Doesn't Do
+
+<Warning>
+  DVC is not:
+  - A database or data warehouse
+  - A data processing framework (like Spark or pandas)
+  - A model serving platform
+  - A full MLOps orchestration system (though it integrates with them)
+  
+  DVC focuses on version control, reproducibility, and collaboration for ML projects.
+</Warning>
+
+## Use Cases
+
+DVC excels in these scenarios:
+
+- **Solo ML practitioners** who want to version experiments and maintain reproducibility
+- **ML teams** collaborating on shared datasets and models
+- **Research projects** requiring reproducible results for publications
+- **Production ML systems** where model provenance and data lineage are critical
+- **Model registries** needing to track which data and code produced each model
+
+## Integration Ecosystem
+
+DVC works alongside your existing tools:
+
+<CardGroup cols={2}>
+  <Card title="Git Platforms" icon="code-branch">
+    GitHub, GitLab, Bitbucket — DVC leverages your existing Git workflow
+  </Card>
+  
+  <Card title="Cloud Storage" icon="cloud">
+    AWS S3, Azure Blob, Google Cloud Storage, and 10+ other storage types
+  </Card>
+  
+  <Card title="VS Code Extension" icon="code">
+    Visual interface for experiments, plots, and data management
+  </Card>
+  
+  <Card title="CI/CD Systems" icon="rotate">
+    Jenkins, GitHub Actions, GitLab CI — automate model training and testing
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+Ready to try DVC? Here's what to do next:
+
+<CardGroup cols={2}>
+  <Card title="Install DVC" icon="download" href="/installation">
+    Set up DVC on your system using pip, conda, brew, or other package managers.
+  </Card>
+  
+  <Card title="Quick Start Tutorial" icon="rocket" href="/quickstart">
+    Follow our hands-on tutorial to track data, build pipelines, and push to remote storage.
+  </Card>
+  
+  <Card title="Command Reference" icon="terminal" href="/commands/overview">
+    Explore all available DVC commands and their options.
+  </Card>
+  
+  <Card title="Python API" icon="python" href="/api/overview">
+    Learn how to use DVC programmatically in your Python scripts.
+  </Card>
+</CardGroup>
+
+## Community and Support
+
+Join thousands of ML practitioners using DVC:
+
+- [Discord Community](https://dvc.org/chat) — Get help and share ideas
+- [Discussion Forum](https://discuss.dvc.org/) — In-depth technical discussions  
+- [GitHub Issues](https://github.com/treeverse/dvc/issues) — Report bugs and request features
+- [Twitter](https://twitter.com/DVCorg) — Stay updated with news and tips
+
+<Tip>
+  DVC is actively developed with frequent releases. Star the [GitHub repository](https://github.com/treeverse/dvc) to stay informed about updates.
+</Tip>

@@ -1,0 +1,630 @@
+---
+title: 'dvc.api.metrics_show()'
+description: 'Retrieve metrics from DVC-tracked metrics files programmatically'
+icon: 'chart-line'
+---
+
+<Note>
+Source: [dvc/api/show.py:35-153](~/workspace/source/dvc/api/show.py)
+</Note>
+
+## Description
+
+Retrieves metrics tracked in a DVC repository. Without arguments, this function retrieves all metrics from all tracked metrics files for the current working tree.
+
+Metrics are typically stored in JSON, YAML, or other structured formats and tracked in `dvc.yaml`. This function provides programmatic access to these metrics for analysis, comparison, and reporting.
+
+## Signature
+
+```python
+dvc.api.metrics_show(
+    *targets: str,
+    repo: Optional[str] = None,
+    rev: Optional[str] = None,
+    config: Optional[dict] = None,
+) -> dict
+```
+
+## Parameters
+
+<ParamField path="*targets" type="str" default="None">
+  Names of the metric files to retrieve metrics from (positional arguments).
+  
+  - If no targets are provided, all metric files tracked in `dvc.yaml` will be used
+  - Targets don't necessarily have to be defined in `dvc.yaml`
+  - Can specify multiple files
+  
+  ```python
+  # Single target
+  metrics = dvc.api.metrics_show("metrics.json")
+  
+  # Multiple targets
+  metrics = dvc.api.metrics_show("train_metrics.json", "eval_metrics.json")
+  
+  # No targets (all metrics)
+  metrics = dvc.api.metrics_show()
+  ```
+</ParamField>
+
+<ParamField path="repo" type="str" default="None">
+  Location of the DVC repository.
+  
+  - Defaults to the current project (found by walking up from current working directory)
+  - Can be a URL or a file system path
+  - Both HTTP and SSH protocols are supported for online Git repos
+  
+  ```python
+  repo="https://github.com/iterative/example-get-started"
+  repo="git@server.com:user/project.git"
+  repo="/path/to/local/repo"
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Name of the Git revision to retrieve metrics from.
+  
+  - Defaults to `None` (current working tree)
+  - Can be a branch name, tag name, commit hash, or DVC experiment name
+  - If `repo` is not a Git repo, this option is ignored
+  
+  ```python
+  rev="main"
+  rev="v1.0.0"
+  rev="abc123"
+  rev="exp-random-forest"
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  Config dictionary to be passed through to the DVC project.
+  
+  ```python
+  config={"cache": {"dir": "/tmp/cache"}}
+  ```
+</ParamField>
+
+## Returns
+
+<ResponseField name="metrics" type="dict">
+  A dictionary containing the metrics. The structure depends on the metrics files:
+  
+  - **Single file**: Returns the metrics directly
+  - **Multiple files with unique keys**: Merges metrics from all files
+  - **Multiple files with conflicting keys**: Prefixes keys with `filename:key`
+  
+  ```python
+  # Example return value
+  {
+      "accuracy": 0.9249,
+      "precision": 0.9156,
+      "recall": 0.9342,
+      "f1_score": 0.9248
+  }
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Usage - All Metrics
+
+```python
+import dvc.api
+import json
+
+# Get all metrics from current working tree
+metrics = dvc.api.metrics_show()
+print(json.dumps(metrics, indent=2))
+```
+
+```json
+{
+  "accuracy": 0.9249974999612706,
+  "precision": 0.9156,
+  "recall": 0.9342,
+  "f1_score": 0.9248,
+  "roc_auc": 0.9460213440787918
+}
+```
+
+### From Specific Git Revision
+
+```python
+import dvc.api
+
+# Get metrics from main branch
+metrics_main = dvc.api.metrics_show(rev="main")
+
+# Get metrics from experiment
+metrics_exp = dvc.api.metrics_show(rev="exp-random-forest")
+
+print(f"Main accuracy: {metrics_main['accuracy']:.4f}")
+print(f"Experiment accuracy: {metrics_exp['accuracy']:.4f}")
+
+if metrics_exp['accuracy'] > metrics_main['accuracy']:
+    print("Experiment improved accuracy!")
+```
+
+### Specific Metrics Files
+
+```python
+import dvc.api
+
+# Get metrics from specific file
+metrics = dvc.api.metrics_show("evaluation.json")
+print(f"ROC AUC: {metrics['roc_auc']}")
+
+# Get metrics from multiple files
+metrics = dvc.api.metrics_show(
+    "train_metrics.json",
+    "eval_metrics.json"
+)
+```
+
+### Remote Repository
+
+```python
+import dvc.api
+
+metrics = dvc.api.metrics_show(
+    repo="https://github.com/iterative/example-get-started"
+)
+print(f"Accuracy: {metrics['avg_prec']:.4f}")
+print(f"ROC AUC: {metrics['roc_auc']:.4f}")
+```
+
+### Compare Metrics Across Branches
+
+```python
+import dvc.api
+import pandas as pd
+
+branches = ["main", "experiment-1", "experiment-2", "experiment-3"]
+results = []
+
+for branch in branches:
+    metrics = dvc.api.metrics_show(rev=branch)
+    results.append({
+        "branch": branch,
+        "accuracy": metrics.get("accuracy"),
+        "f1_score": metrics.get("f1_score")
+    })
+
+df = pd.DataFrame(results)
+print(df.to_string())
+print(f"\nBest accuracy: {df['accuracy'].max():.4f}")
+```
+
+### Compare Against Baseline
+
+```python
+import dvc.api
+
+# Get baseline metrics
+baseline = dvc.api.metrics_show(rev="v1.0.0")
+
+# Get current metrics
+current = dvc.api.metrics_show()
+
+# Compare
+for metric in ["accuracy", "precision", "recall"]:
+    baseline_val = baseline.get(metric, 0)
+    current_val = current.get(metric, 0)
+    improvement = current_val - baseline_val
+    
+    print(f"{metric}:")
+    print(f"  Baseline: {baseline_val:.4f}")
+    print(f"  Current:  {current_val:.4f}")
+    print(f"  Change:   {improvement:+.4f}")
+```
+
+### Track Model Performance Over Time
+
+```python
+import dvc.api
+from datetime import datetime
+
+# Get metrics from different tags (releases)
+tags = ["v1.0.0", "v1.1.0", "v1.2.0", "v2.0.0"]
+performance_history = []
+
+for tag in tags:
+    try:
+        metrics = dvc.api.metrics_show(rev=tag)
+        performance_history.append({
+            "version": tag,
+            "accuracy": metrics.get("accuracy"),
+            "f1_score": metrics.get("f1_score")
+        })
+    except Exception as e:
+        print(f"Could not get metrics for {tag}: {e}")
+
+# Plot or analyze the history
+for entry in performance_history:
+    print(f"{entry['version']}: accuracy={entry['accuracy']:.4f}")
+```
+
+### Automated Performance Check
+
+```python
+import dvc.api
+import sys
+
+# Get metrics from current experiment
+current_metrics = dvc.api.metrics_show()
+
+# Get metrics from production
+prod_metrics = dvc.api.metrics_show(rev="production")
+
+# Define threshold
+MIN_ACCURACY = 0.90
+MIN_IMPROVEMENT = 0.02
+
+current_acc = current_metrics.get("accuracy", 0)
+prod_acc = prod_metrics.get("accuracy", 0)
+
+if current_acc < MIN_ACCURACY:
+    print(f"ERROR: Accuracy {current_acc:.4f} below threshold {MIN_ACCURACY}")
+    sys.exit(1)
+
+if current_acc < prod_acc + MIN_IMPROVEMENT:
+    print(f"WARNING: Insufficient improvement over production")
+    print(f"Current: {current_acc:.4f}, Production: {prod_acc:.4f}")
+    sys.exit(1)
+
+print(f"SUCCESS: Model meets quality criteria")
+print(f"Accuracy: {current_acc:.4f} (production: {prod_acc:.4f})")
+```
+
+### Export Metrics to CSV
+
+```python
+import dvc.api
+import csv
+
+experiments = [
+    "exp-baseline",
+    "exp-feature-eng",
+    "exp-hyperparams",
+    "exp-ensemble"
+]
+
+with open("metrics_comparison.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["Experiment", "Accuracy", "Precision", "Recall", "F1"])
+    
+    for exp in experiments:
+        try:
+            metrics = dvc.api.metrics_show(rev=exp)
+            writer.writerow([
+                exp,
+                metrics.get("accuracy"),
+                metrics.get("precision"),
+                metrics.get("recall"),
+                metrics.get("f1_score")
+            ])
+        except Exception as e:
+            print(f"Skipping {exp}: {e}")
+
+print("Metrics exported to metrics_comparison.csv")
+```
+
+### Handle Multiple Metrics Files
+
+```python
+import dvc.api
+
+# When files have conflicting keys, they're prefixed with filename
+metrics = dvc.api.metrics_show(
+    "train_metrics.json",
+    "validation_metrics.json"
+)
+
+# Access metrics from specific files
+train_loss = metrics.get("train_metrics.json:loss")
+val_loss = metrics.get("validation_metrics.json:loss")
+
+print(f"Training loss: {train_loss}")
+print(f"Validation loss: {val_loss}")
+```
+
+### Error Handling
+
+```python
+import dvc.api
+
+try:
+    metrics = dvc.api.metrics_show(
+        "metrics.json",
+        repo="https://github.com/user/repo",
+        rev="main"
+    )
+    print(f"Accuracy: {metrics.get('accuracy')}")
+except FileNotFoundError:
+    print("Metrics file not found")
+except KeyError as e:
+    print(f"Metric key not found: {e}")
+except Exception as e:
+    print(f"Error retrieving metrics: {e}")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Model Evaluation" icon="microscope">
+  Retrieve and compare model performance metrics across experiments.
+</Card>
+
+<Card title="CI/CD Integration" icon="rotate">
+  Automate quality checks based on metrics in deployment pipelines.
+</Card>
+
+<Card title="Performance Tracking" icon="chart-line">
+  Track model performance over time across different versions.
+</Card>
+
+<Card title="Experiment Analysis" icon="flask">
+  Analyze and compare metrics from multiple experiments.
+</Card>
+
+</CardGroup>
+
+## Metrics File Formats
+
+<Tabs>
+  <Tab title="JSON">
+    ```json
+    {
+      "accuracy": 0.9249,
+      "precision": 0.9156,
+      "recall": 0.9342,
+      "f1_score": 0.9248,
+      "confusion_matrix": [[45, 5], [3, 47]]
+    }
+    ```
+    
+    ```python
+    metrics = dvc.api.metrics_show("metrics.json")
+    print(metrics["accuracy"])  # 0.9249
+    ```
+  </Tab>
+  
+  <Tab title="YAML">
+    ```yaml
+    # metrics.yaml
+    accuracy: 0.9249
+    precision: 0.9156
+    recall: 0.9342
+    f1_score: 0.9248
+    ```
+    
+    ```python
+    metrics = dvc.api.metrics_show("metrics.yaml")
+    print(metrics["f1_score"])  # 0.9248
+    ```
+  </Tab>
+  
+  <Tab title="TOML">
+    ```toml
+    accuracy = 0.9249
+    precision = 0.9156
+    recall = 0.9342
+    f1_score = 0.9248
+    ```
+    
+    ```python
+    metrics = dvc.api.metrics_show("metrics.toml")
+    print(metrics["recall"])  # 0.9342
+    ```
+  </Tab>
+  
+  <Tab title="Plain Text">
+    ```text
+    0.9249
+    ```
+    
+    ```python
+    # For single-value metrics files
+    # DVC reads the numeric value
+    ```
+  </Tab>
+</Tabs>
+
+## Return Value Structure
+
+<AccordionGroup>
+
+<Accordion title="Single metrics file">
+  When retrieving metrics from a single file, the structure matches the file content:
+  
+  ```python
+  metrics = dvc.api.metrics_show("metrics.json")
+  # {
+  #   "accuracy": 0.9249,
+  #   "precision": 0.9156,
+  #   "recall": 0.9342
+  # }
+  ```
+</Accordion>
+
+<Accordion title="Multiple files (unique keys)">
+  When metric keys are unique across files, they're merged:
+  
+  ```python
+  metrics = dvc.api.metrics_show("train_metrics.json", "eval_metrics.json")
+  # {
+  #   "train_loss": 0.23,     # from train_metrics.json
+  #   "eval_accuracy": 0.92   # from eval_metrics.json
+  # }
+  ```
+</Accordion>
+
+<Accordion title="Multiple files (conflicting keys)">
+  When keys conflict, they're prefixed with the filename:
+  
+  ```python
+  metrics = dvc.api.metrics_show("train.json", "val.json")
+  # {
+  #   "train.json:loss": 0.23,
+  #   "val.json:loss": 0.31
+  # }
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Configuring Metrics in dvc.yaml
+
+```yaml
+stages:
+  train:
+    cmd: python train.py
+    metrics:
+      - metrics/train.json:
+          cache: false
+  
+  evaluate:
+    cmd: python evaluate.py
+    metrics:
+      - metrics/eval.json:
+          cache: false
+```
+
+```python
+# Retrieve all configured metrics
+metrics = dvc.api.metrics_show()
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Use structured formats">
+  Store metrics in JSON or YAML for easy access:
+  
+  ```python
+  # Good - Structured format
+  import json
+  metrics = {
+      "accuracy": 0.92,
+      "loss": 0.23,
+      "f1_score": 0.89
+  }
+  with open("metrics.json", "w") as f:
+      json.dump(metrics, f)
+  ```
+</Accordion>
+
+<Accordion title="Compare against baselines">
+  Always compare new metrics against established baselines:
+  
+  ```python
+  import dvc.api
+  
+  baseline = dvc.api.metrics_show(rev="baseline")
+  current = dvc.api.metrics_show()
+  
+  for metric, value in current.items():
+      baseline_val = baseline.get(metric, 0)
+      print(f"{metric}: {value:.4f} (baseline: {baseline_val:.4f})")
+  ```
+</Accordion>
+
+<Accordion title="Track multiple metrics">
+  Track comprehensive metrics, not just accuracy:
+  
+  ```python
+  metrics = {
+      "accuracy": 0.92,
+      "precision": 0.89,
+      "recall": 0.94,
+      "f1_score": 0.91,
+      "roc_auc": 0.95,
+      "training_time": 142.5,
+      "inference_time_ms": 23.4
+  }
+  ```
+</Accordion>
+
+<Accordion title="Handle missing metrics gracefully">
+  Use `.get()` with defaults:
+  
+  ```python
+  import dvc.api
+  
+  metrics = dvc.api.metrics_show()
+  
+  accuracy = metrics.get("accuracy", 0.0)
+  precision = metrics.get("precision", 0.0)
+  
+  if accuracy > 0:
+      print(f"Accuracy: {accuracy:.4f}")
+  else:
+      print("Accuracy metric not available")
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Integration Examples
+
+### MLflow Integration
+
+```python
+import dvc.api
+import mlflow
+
+# Log DVC metrics to MLflow
+metrics = dvc.api.metrics_show()
+
+with mlflow.start_run():
+    for key, value in metrics.items():
+        if isinstance(value, (int, float)):
+            mlflow.log_metric(key, value)
+```
+
+### Weights & Biases Integration
+
+```python
+import dvc.api
+import wandb
+
+wandb.init(project="my-project")
+
+# Log DVC metrics to W&B
+metrics = dvc.api.metrics_show()
+wandb.log(metrics)
+```
+
+### Slack Notification
+
+```python
+import dvc.api
+import requests
+
+metrics = dvc.api.metrics_show()
+baseline = dvc.api.metrics_show(rev="production")
+
+if metrics["accuracy"] > baseline["accuracy"]:
+    message = f"🎉 New model improved accuracy to {metrics['accuracy']:.4f}!"
+    # Send to Slack webhook
+    requests.post(SLACK_WEBHOOK_URL, json={"text": message})
+```
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="params_show()" icon="sliders" href="/api/params_show">
+  Retrieve parameters values
+</Card>
+
+<Card title="exp_show()" icon="flask" href="/api/exp_show">
+  Show experiments with metrics
+</Card>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read any tracked file
+</Card>
+
+</CardGroup>

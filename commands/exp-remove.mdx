@@ -1,0 +1,394 @@
+---
+title: 'dvc exp remove'
+description: 'Remove one or more experiments from the project'
+---
+
+## Description
+
+Remove experiments from your DVC project. This command deletes experiment references and associated data, helping you clean up unsuccessful experiments or maintain a tidy experiment history. You can remove individual experiments, all experiments from specific commits, or queued experiments.
+
+<Warning>
+This operation is irreversible. Removed experiments cannot be recovered. Review your selection carefully before removing experiments.
+</Warning>
+
+## Usage
+
+```bash
+dvc exp remove [<experiment>...] [options]
+```
+
+Aliases: `dvc exp rm`
+
+## Arguments
+
+<ParamField path="experiment" type="string[]" optional>
+  One or more experiment names to remove. Can specify multiple experiments separated by spaces.
+  
+  ```bash
+  dvc exp remove exp-a1b2c
+  dvc exp remove exp-123 exp-456 exp-789
+  ```
+</ParamField>
+
+## Options
+
+### Selection Options
+
+<ParamField path="--rev" type="string[]">
+  Remove all experiments from the specified Git revisions. Can be used multiple times.
+  
+  ```bash
+  dvc exp remove --rev HEAD
+  dvc exp remove --rev main --rev feature-branch
+  ```
+</ParamField>
+
+<ParamField path="--all-commits" type="boolean" default="false">
+  Remove experiments from all Git commits.
+  
+  ```bash
+  dvc exp remove --all-commits
+  ```
+</ParamField>
+
+<ParamField path="--num" type="integer" default="1">
+  Remove experiments from the last N commits. Used with `--rev` or `--all-commits`.
+  
+  ```bash
+  dvc exp remove --num 5
+  ```
+</ParamField>
+
+<ParamField path="--queue" type="boolean" default="false">
+  Remove all queued experiments (experiments staged with `dvc exp run --queue` but not yet executed).
+  
+  ```bash
+  dvc exp remove --queue
+  ```
+</ParamField>
+
+<ParamField path="--keep" type="integer">
+  Keep the N most recent experiments and remove the rest. Must be used with `--rev` or `--all-commits`.
+  
+  ```bash
+  dvc exp remove --all-commits --keep 10
+  ```
+</ParamField>
+
+<ParamField path="-g, --git-remote" type="string">
+  Name or URL of the Git remote to remove the experiment from. This removes experiments from a remote repository.
+  
+  ```bash
+  dvc exp remove exp-a1b2c --git-remote origin
+  dvc exp remove exp-a1b2c --git-remote https://github.com/user/repo.git
+  ```
+</ParamField>
+
+## Examples
+
+### Remove a single experiment
+
+```bash
+dvc exp remove exp-a1b2c
+```
+
+Output:
+```bash
+Removed experiments: 'exp-a1b2c'
+```
+
+<Info>
+Removing an experiment deletes its reference and cached data, but doesn't affect any Git branches created from it.
+</Info>
+
+### Remove multiple experiments
+
+```bash
+dvc exp remove exp-123 exp-456 exp-789
+```
+
+Output:
+```bash
+Removed experiments: 'exp-123', 'exp-456', 'exp-789'
+```
+
+### Remove all experiments from current commit
+
+```bash
+dvc exp remove --rev HEAD
+```
+
+Output:
+```bash
+Removed experiments: 'exp-a1b2c', 'exp-d3e4f', 'exp-g7h8i'
+```
+
+<Tip>
+This is useful for cleaning up after a hyperparameter sweep on the current commit.
+</Tip>
+
+### Remove all queued experiments
+
+```bash
+# Queue some experiments
+dvc exp run --queue -S lr=0.1
+dvc exp run --queue -S lr=0.01
+dvc exp run --queue -S lr=0.001
+
+# Remove all queued experiments
+dvc exp remove --queue
+```
+
+Output:
+```bash
+Removed experiments: 'exp-queued-1', 'exp-queued-2', 'exp-queued-3'
+```
+
+<Note>
+This only removes queued experiments that haven't been executed yet.
+</Note>
+
+### Remove experiments from multiple branches
+
+```bash
+dvc exp remove --rev main --rev feature-branch
+```
+
+Output:
+```bash
+Removed experiments: 'exp-main-1', 'exp-main-2', 'exp-feature-1', 'exp-feature-2'
+```
+
+### Keep only recent experiments
+
+```bash
+# Keep 5 most recent experiments, remove all others
+dvc exp remove --all-commits --keep 5
+```
+
+Output:
+```bash
+Removed experiments: 'exp-old-1', 'exp-old-2', 'exp-old-3', ...
+```
+
+<Tip>
+Use `--keep` to maintain a fixed number of experiments for reference while cleaning up older ones.
+</Tip>
+
+### Remove from last N commits
+
+```bash
+# Remove experiments from last 3 commits
+dvc exp remove --num 3
+```
+
+Output:
+```bash
+Removed experiments: 'exp-1', 'exp-2', 'exp-3', 'exp-4', 'exp-5'
+```
+
+### Remove all experiments
+
+```bash
+dvc exp remove --all-commits
+```
+
+Output:
+```bash
+Removed experiments: 'exp-1', 'exp-2', ..., 'exp-99', 'exp-100'
+```
+
+<Warning>
+This removes ALL experiments from your project. Use with extreme caution!
+</Warning>
+
+### Remove from remote repository
+
+```bash
+dvc exp remove exp-a1b2c --git-remote origin
+```
+
+Output:
+```bash
+Removed experiments: 'exp-a1b2c' from remote 'origin'
+```
+
+<Info>
+This removes the experiment from the remote Git repository, not just your local copy.
+</Info>
+
+## Common Workflows
+
+### Clean up failed experiments
+
+```bash
+# View all experiments including failed ones
+dvc exp show
+
+# Remove failed experiments one by one
+dvc exp remove exp-failed-1 exp-failed-2 exp-failed-3
+```
+
+### Maintain experiment history limit
+
+```bash
+# Periodically clean up, keeping only last 20 experiments
+dvc exp remove --all-commits --keep 20
+```
+
+### Cancel queued experiments
+
+```bash
+# Queue multiple experiments
+for lr in 0.1 0.01 0.001 0.0001 0.00001; do
+  dvc exp run --queue -S train.lr=$lr
+done
+
+# Decided not to run them
+dvc exp remove --queue
+```
+
+### Clean up before archiving
+
+```bash
+# Before archiving project, remove all experiments
+# (keep only promoted branches)
+dvc exp remove --all-commits
+
+# Archive repository
+git archive --format=zip --output=project-archive.zip HEAD
+```
+
+### Remove experiments after promotion
+
+```bash
+# Find best experiment
+dvc exp show --sort-by accuracy --sort-order desc
+
+# Promote it to a branch
+dvc exp branch exp-best model/production
+
+# Remove the temporary experiment
+dvc exp remove exp-best
+
+# The branch persists even though experiment is removed
+git branch
+```
+
+<Note>
+Removing an experiment doesn't affect Git branches created from it using `dvc exp branch`.
+</Note>
+
+## Understanding Removal Scope
+
+### What Gets Removed
+
+1. **Experiment references**: Entries in DVC's experiment database
+2. **Cached data**: Model outputs and artifacts unique to the experiment
+3. **Metrics history**: Historical metrics recorded for the experiment
+4. **Parameter snapshots**: Parameter values used in the experiment
+
+### What Doesn't Get Removed
+
+1. **Git branches**: Branches created via `dvc exp branch` remain intact
+2. **Shared cache**: Data shared with other experiments or commits
+3. **Git commits**: Regular Git commits are unaffected
+4. **Current workspace**: Your working directory remains unchanged
+
+<Info>
+DVC uses reference counting for cached data. Removing an experiment only deletes data that's not referenced by other experiments or commits.
+</Info>
+
+## Validation and Safety
+
+### Confirm before removal
+
+```bash
+# List experiments that would be removed
+dvc exp show --rev HEAD
+
+# Then remove
+dvc exp remove --rev HEAD
+```
+
+### Remove with filtering
+
+```bash
+# View all experiments
+dvc exp show
+
+# Remove only specific failed ones
+dvc exp show | grep "!" | awk '{print $1}' | xargs dvc exp remove
+```
+
+### Backup before bulk removal
+
+```bash
+# Export experiments to JSON before removing
+dvc exp show --json > experiments-backup.json
+
+# Now safe to remove
+dvc exp remove --all-commits --keep 10
+
+# Can review backup if needed
+cat experiments-backup.json | jq
+```
+
+## Troubleshooting
+
+### No experiments to remove
+
+```bash
+dvc exp remove --rev HEAD
+```
+
+Output:
+```bash
+No experiments to remove.
+```
+
+<Info>
+This means there are no experiments associated with the specified revision.
+</Info>
+
+### Experiment not found
+
+```bash
+dvc exp remove nonexistent-exp
+```
+
+Output:
+```bash
+ERROR: experiment 'nonexistent-exp' not found
+```
+
+Solution:
+```bash
+# List available experiments
+dvc exp show
+
+# Use correct experiment name
+dvc exp remove exp-a1b2c
+```
+
+### Cannot remove from remote
+
+```bash
+dvc exp remove exp-a1b2c --git-remote origin
+```
+
+Output:
+```bash
+ERROR: permission denied when removing from remote 'origin'
+```
+
+<Warning>
+Removing experiments from a remote requires write access to the remote repository.
+</Warning>
+
+## Related Commands
+
+- `dvc exp show` - View experiments before removing
+- `dvc exp run` - Create new experiments
+- `dvc exp branch` - Convert experiment to permanent branch before removing
+- `dvc gc` - Clean up unused cache data (after removing experiments)

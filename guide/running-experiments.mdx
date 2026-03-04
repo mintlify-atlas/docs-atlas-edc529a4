@@ -1,0 +1,488 @@
+---
+title: "Running Experiments"
+description: "Track and compare ML experiments with DVC"
+---
+
+## Overview
+
+DVC experiments let you iterate on your ML models by running your pipeline with different parameters, code changes, or data. Each experiment is tracked automatically, allowing you to compare results and reproduce your best models.
+
+<Info>
+  Experiments are Git-based but don't clutter your repository. They're stored as lightweight references that you can review, compare, and promote to branches.
+</Info>
+
+## Quick Start
+
+<Steps>
+  <Step title="Set up your pipeline">
+    First, ensure you have a pipeline with parameters:
+
+    ```yaml dvc.yaml
+    stages:
+      train:
+        cmd: python train.py
+        deps:
+          - train.py
+          - data/train.csv
+        params:
+          - train.lr
+          - train.epochs
+        outs:
+          - models/model.pkl
+        metrics:
+          - metrics.json:
+              cache: false
+    ```
+
+    ```yaml params.yaml
+    train:
+      lr: 0.001
+      epochs: 10
+    ```
+  </Step>
+
+  <Step title="Run your first experiment">
+    Run an experiment with different parameter values:
+
+    ```bash
+    dvc exp run -n "high-lr" -S train.lr=0.01
+    ```
+
+    This:
+    - Runs your pipeline with `lr=0.01`
+    - Names the experiment `high-lr`
+    - Tracks all results automatically
+  </Step>
+
+  <Step title="View experiment results">
+    See all experiments and their metrics:
+
+    ```bash
+    dvc exp show
+    ```
+
+    You'll see a table comparing all experiments, their parameters, and metrics.
+  </Step>
+</Steps>
+
+## Running Experiments
+
+### With Parameter Changes
+
+Modify parameters on the fly using `-S` or `--set-param`:
+
+<CodeGroup>
+
+```bash Single parameter
+dvc exp run -S train.lr=0.01
+```
+
+```bash Multiple parameters
+dvc exp run -S train.lr=0.01 -S train.epochs=20
+```
+
+```bash Nested parameters
+dvc exp run -S model.layers=[128,64,32] -S train.dropout=0.3
+```
+
+```bash Named experiment
+dvc exp run -n "adam-optimizer" -S train.optimizer=adam
+```
+
+</CodeGroup>
+
+<Tip>
+  Use `-n` or `--name` to give experiments meaningful names. Otherwise, DVC auto-generates names like `exp-a1b2c`.
+</Tip>
+
+### With Code Changes
+
+Make code changes and run experiments without committing:
+
+```bash
+# Edit your training script
+vim train.py
+
+# Run experiment with modified code
+dvc exp run -n "new-architecture"
+```
+
+<Note>
+  DVC tracks uncommitted code changes in experiments. You can experiment freely without affecting your main branch.
+</Note>
+
+### Queue and Run Multiple Experiments
+
+Queue experiments for batch processing:
+
+```bash
+# Queue experiments
+dvc exp run --queue -S train.lr=0.001
+dvc exp run --queue -S train.lr=0.01
+dvc exp run --queue -S train.lr=0.1
+
+# Run all queued experiments
+dvc exp run --run-all
+```
+
+<Info>
+  Use `-j` or `--jobs` to run experiments in parallel: `dvc exp run --run-all -j 4`
+</Info>
+
+### Run in Temporary Directory
+
+Run experiments without affecting your workspace:
+
+```bash
+dvc exp run --temp -S train.lr=0.01
+```
+
+This creates a temporary directory, runs the experiment, and cleans up automatically.
+
+## Viewing Experiments
+
+### Show All Experiments
+
+Display a table of all experiments:
+
+```bash
+dvc exp show
+```
+
+Example output:
+
+```bash
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┓
+┃ Experiment         ┃ Created ┃ train.lr   ┃ accuracy ┃ loss      ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━┩
+│ workspace          │ -       │ 0.001      │ 0.92     │ 0.234     │
+│ ├── exp-high-lr    │ 12:34PM │ 0.01       │ 0.89     │ 0.312     │
+│ ├── exp-low-lr     │ 11:20AM │ 0.0001     │ 0.94     │ 0.187     │
+│ main               │ -       │ 0.001      │ 0.91     │ 0.245     │
+└────────────────────┴─────────┴────────────┴──────────┴───────────┘
+```
+
+### Filter and Sort
+
+<Tabs>
+  <Tab title="Sort by metric">
+    ```bash
+    dvc exp show --sort-by accuracy --sort-order desc
+    ```
+  </Tab>
+
+  <Tab title="Show only changed values">
+    ```bash
+    dvc exp show --only-changed
+    ```
+  </Tab>
+
+  <Tab title="Filter columns">
+    ```bash
+    # Keep only specific columns
+    dvc exp show --keep 'train.*'
+    
+    # Drop specific columns
+    dvc exp show --drop 'params.dropout'
+    ```
+  </Tab>
+
+  <Tab title="All branches">
+    ```bash
+    dvc exp show --all-branches
+    ```
+  </Tab>
+</Tabs>
+
+### Export to CSV or JSON
+
+<CodeGroup>
+
+```bash CSV format
+dvc exp show --csv > experiments.csv
+```
+
+```bash JSON format
+dvc exp show --json > experiments.json
+```
+
+```bash Markdown table
+dvc exp show --md > experiments.md
+```
+
+</CodeGroup>
+
+## Comparing Experiments
+
+### Compare Two Experiments
+
+See the differences between two experiments:
+
+```bash
+dvc exp diff exp-baseline exp-high-lr
+```
+
+Example output:
+
+```bash
+Path         Metric      Value     Change
+metrics.json accuracy    0.89      -0.03
+metrics.json loss        0.312     +0.078
+
+Path         Param       Value     Change
+params.yaml  train.lr    0.01      +0.009
+```
+
+### Compare with Workspace
+
+Compare an experiment to your current workspace:
+
+```bash
+dvc exp diff exp-baseline
+```
+
+### Include All Metrics and Params
+
+```bash
+dvc exp diff --all exp-baseline exp-high-lr
+```
+
+## Managing Experiments
+
+### Apply an Experiment
+
+Restore an experiment to your workspace:
+
+```bash
+dvc exp apply exp-low-lr
+```
+
+<Warning>
+  This replaces your workspace with the experiment's code, parameters, and data. Commit or stash changes first.
+</Warning>
+
+### Create a Branch from an Experiment
+
+Promote a successful experiment to a Git branch:
+
+```bash
+dvc exp branch exp-low-lr best-model
+```
+
+Now you can:
+
+```bash
+git checkout best-model
+git merge main
+```
+
+### Remove Experiments
+
+<CodeGroup>
+
+```bash Remove specific experiment
+dvc exp remove exp-failed
+```
+
+```bash Remove all experiments
+dvc exp remove --all
+```
+
+```bash Remove experiments in queue
+dvc exp remove --queue
+```
+
+</CodeGroup>
+
+### Push and Pull Experiments
+
+Share experiments with your team:
+
+<Tabs>
+  <Tab title="Push experiments">
+    ```bash
+    # Push specific experiment
+    dvc exp push origin exp-high-lr
+    
+    # Push all experiments
+    dvc exp push origin --all
+    ```
+  </Tab>
+
+  <Tab title="Pull experiments">
+    ```bash
+    # Pull specific experiment
+    dvc exp pull origin exp-high-lr
+    
+    # Pull all experiments
+    dvc exp pull origin --all
+    ```
+  </Tab>
+
+  <Tab title="List remote experiments">
+    ```bash
+    dvc exp list origin
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Workflows
+
+### Grid Search
+
+Run experiments with multiple parameter combinations:
+
+```bash
+# Queue a grid of experiments
+for lr in 0.001 0.01 0.1; do
+  for epochs in 10 20 50; do
+    dvc exp run --queue \
+      -n "lr${lr}-e${epochs}" \
+      -S train.lr=$lr \
+      -S train.epochs=$epochs
+  done
+done
+
+# Run all queued experiments in parallel
+dvc exp run --run-all -j 4
+```
+
+### Hyperparameter Tuning
+
+Integrate with your tuning framework:
+
+```python train.py
+import dvc.api
+import optuna
+
+def objective(trial):
+    lr = trial.suggest_float('lr', 1e-5, 1e-1, log=True)
+    epochs = trial.suggest_int('epochs', 10, 100)
+    
+    # Train model with hyperparameters
+    accuracy = train_model(lr=lr, epochs=epochs)
+    
+    return accuracy
+
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=100)
+```
+
+### Custom Commit Messages
+
+Add context to experiments:
+
+```bash
+dvc exp run -m "Testing new data augmentation" -S train.augment=true
+```
+
+## Experiment Table Customization
+
+### Show Only Stage Dependencies
+
+```bash
+dvc exp show --param-deps
+```
+
+This shows only parameters that are declared as stage dependencies in `dvc.yaml`.
+
+### Precision Control
+
+```bash
+dvc exp show --precision 4
+```
+
+Round metrics to 4 decimal places.
+
+### Hide Columns
+
+```bash
+# Hide workspace, queued, or failed experiments
+dvc exp show --hide-workspace --hide-queued --hide-failed
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Name your experiments" icon="tag">
+  Use descriptive names like `-n "baseline-model"` instead of auto-generated IDs
+</Card>
+
+<Card title="Track all parameters" icon="list-check">
+  Declare all hyperparameters in `params.yaml` for complete experiment tracking
+</Card>
+
+<Card title="Use queues for batches" icon="layer-group">
+  Queue multiple experiments and run them in parallel with `--run-all -j N`
+</Card>
+
+<Card title="Branch successful experiments" icon="code-branch">
+  Promote winning experiments to branches: `dvc exp branch exp-name feature-branch`
+</Card>
+
+<Card title="Compare systematically" icon="code-compare">
+  Use `dvc exp diff` to understand what changed between experiments
+</Card>
+
+<Card title="Clean up regularly" icon="broom">
+  Remove failed experiments to keep your experiment list manageable
+</Card>
+
+</CardGroup>
+
+## Complete Example
+
+Here's a full workflow:
+
+<Steps>
+  <Step title="Baseline experiment">
+    ```bash
+    dvc exp run -n "baseline"
+    ```
+  </Step>
+
+  <Step title="Try different learning rates">
+    ```bash
+    dvc exp run --queue -n "lr-0.001" -S train.lr=0.001
+    dvc exp run --queue -n "lr-0.01" -S train.lr=0.01
+    dvc exp run --queue -n "lr-0.1" -S train.lr=0.1
+    dvc exp run --run-all -j 3
+    ```
+  </Step>
+
+  <Step title="Compare results">
+    ```bash
+    dvc exp show --sort-by accuracy --sort-order desc
+    ```
+  </Step>
+
+  <Step title="Test best configuration">
+    ```bash
+    dvc exp apply lr-0.01
+    dvc exp run -n "final-model" -S train.epochs=100
+    ```
+  </Step>
+
+  <Step title="Promote to production">
+    ```bash
+    dvc exp branch final-model production
+    git checkout production
+    git push origin production
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Remote Storage" icon="cloud" href="/guide/remote-storage">
+  Store experiment results and models in remote storage
+</Card>
+
+<Card title="Collaboration" icon="users" href="/guide/collaboration">
+  Share experiments and pipelines with your team
+</Card>
+
+</CardGroup>

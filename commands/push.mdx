@@ -1,0 +1,407 @@
+---
+title: dvc push
+description: Upload tracked files or directories to remote storage
+---
+
+## Synopsis
+
+```bash
+dvc push [options] [<targets>...]
+```
+
+## Description
+
+The `dvc push` command uploads DVC-tracked files and directories from your local cache to remote storage (such as S3, GCS, Azure, or SSH storage).
+
+This is analogous to `git push` but for your data files. It ensures that:
+
+- Your data is safely backed up in remote storage
+- Team members can access the data with `dvc pull`
+- CI/CD systems can fetch the necessary data
+- Different environments can sync the same data versions
+
+`dvc push` only uploads files that don't already exist in the remote storage, making it efficient for incremental updates.
+
+<Info>
+You must configure a remote storage location before using `dvc push`. Use `dvc remote add` to set up a remote.
+</Info>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names. If not specified, pushes all tracked data.
+  
+  ```bash
+  dvc push data/train.csv models/model.pkl
+  ```
+</ParamField>
+
+<ParamField path="-r, --remote" type="string">
+  Remote storage to push to. If not specified, uses the default remote configured in `.dvc/config`.
+  
+  ```bash
+  dvc push --remote s3storage
+  ```
+</ParamField>
+
+<ParamField path="-j, --jobs" type="integer" default="4 * cpu_count()">
+  Number of jobs to run simultaneously. Higher values increase parallelism but use more resources.
+  
+  ```bash
+  dvc push --jobs 8
+  ```
+</ParamField>
+
+<ParamField path="-a, --all-branches" type="boolean" default="false">
+  Push cache for all Git branches. Useful for backing up all experiments.
+  
+  ```bash
+  dvc push --all-branches
+  ```
+  
+  <Warning>
+  This can upload a lot of data if you have many branches with different datasets.
+  </Warning>
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="boolean" default="false">
+  Push cache for all Git tags.
+  
+  ```bash
+  dvc push --all-tags
+  ```
+</ParamField>
+
+<ParamField path="-A, --all-commits" type="boolean" default="false">
+  Push cache for all Git commits.
+  
+  <Warning>
+  This can be very slow and upload large amounts of data. Use with caution.
+  </Warning>
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Push cache for all dependencies of the specified target.
+  
+  ```bash
+  dvc push --with-deps train.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Push cache for subdirectories of the specified directory.
+  
+  ```bash
+  dvc push --recursive experiments/
+  ```
+</ParamField>
+
+<ParamField path="--run-cache" type="boolean" default="false">
+  Push run history for all stages. This includes execution metadata and can help reproduce pipeline runs.
+  
+  ```bash
+  dvc push --run-cache
+  ```
+</ParamField>
+
+<ParamField path="--glob" type="boolean" default="false">
+  Allows targets containing shell-style wildcards.
+  
+  ```bash
+  dvc push --glob "data/*.csv"
+  ```
+</ParamField>
+
+## Examples
+
+### Basic push
+
+Push all tracked data to the default remote:
+
+```bash
+dvc push
+```
+
+```terminal
+Everything is up to date.
+```
+
+Or if there are files to push:
+
+```terminal
+2 files pushed
+```
+
+### Push specific files
+
+Push only specific targets:
+
+```bash
+dvc push data/train.csv.dvc
+```
+
+```terminal
+1 file pushed
+```
+
+### Push to specific remote
+
+Push to a named remote:
+
+```bash
+dvc push --remote backup
+```
+
+### Push with higher parallelism
+
+Speed up push with more concurrent jobs:
+
+```bash
+dvc push --jobs 16
+```
+
+### Push all branches
+
+Backup data from all branches:
+
+```bash
+dvc push --all-branches
+```
+
+```terminal
+15 files pushed
+```
+
+<Info>
+This is useful for ensuring all experimental branches are backed up before cleanup.
+</Info>
+
+### Push with dependencies
+
+Push a pipeline stage and all its dependencies:
+
+```bash
+dvc push --with-deps evaluate.dvc
+```
+
+### Push with wildcards
+
+```bash
+dvc push --glob "experiments/exp-*/*.dvc"
+```
+
+## Example workflows
+
+### Workflow 1: Regular development
+
+```bash
+# 1. Add or modify data
+dvc add data/new_dataset.csv
+
+# 2. Commit to Git
+git add data/new_dataset.csv.dvc data/.gitignore
+git commit -m "Add new dataset"
+
+# 3. Push data to remote
+dvc push
+
+# 4. Push Git commits
+git push
+```
+
+<Tip>
+Always `dvc push` before `git push` to ensure data is backed up before code references are published.
+</Tip>
+
+### Workflow 2: After running pipeline
+
+```bash
+# Run your pipeline
+dvc repro
+
+# Check what changed
+dvc status --cloud
+
+# Push new outputs
+dvc push
+
+# Commit pipeline changes
+git add dvc.lock
+git commit -m "Update pipeline outputs"
+git push
+```
+
+### Workflow 3: Backup all experiments
+
+```bash
+# Backup all branch data before cleanup
+dvc push --all-branches
+
+# Now safe to delete local branches
+git branch -d old-experiment
+
+# Clean local cache
+dvc gc --workspace
+```
+
+### Workflow 4: Team collaboration
+
+```bash
+# You: Update dataset
+python update_data.py
+dvc commit data/dataset.csv.dvc
+
+# Push to remote
+dvc push
+
+# Commit and push to Git
+git add data/dataset.csv.dvc
+git commit -m "Update dataset with new samples"
+git push
+
+# Teammate: Pull changes
+git pull
+dvc pull
+```
+
+## Setting up remotes
+
+Before using `dvc push`, configure a remote:
+
+### S3
+
+```bash
+dvc remote add -d myremote s3://mybucket/path
+```
+
+### Google Cloud Storage
+
+```bash
+dvc remote add -d myremote gs://mybucket/path
+```
+
+### Azure Blob Storage
+
+```bash
+dvc remote add -d myremote azure://mycontainer/path
+```
+
+### SSH/SFTP
+
+```bash
+dvc remote add -d myremote ssh://user@host/path
+```
+
+### Local or Network Drive
+
+```bash
+dvc remote add -d myremote /mnt/shared/dvc-storage
+```
+
+Set as default:
+
+```bash
+dvc remote default myremote
+```
+
+## Checking what needs to be pushed
+
+Before pushing, check status:
+
+```bash
+dvc status --cloud
+```
+
+```terminal
+new:            data/train.csv
+new:            models/model.pkl
+```
+
+This shows files in local cache that haven't been pushed to remote.
+
+## Understanding push output
+
+```terminal
+2 files pushed
+```
+
+Or if everything is synced:
+
+```terminal
+Everything is up to date.
+```
+
+With multiple branches:
+
+```terminal
+main:
+        2 files pushed
+experiment-1:
+        3 files pushed
+```
+
+## Error handling
+
+### No remote configured
+
+```terminal
+ERROR: no remote provided and no default remote set
+```
+
+**Solution**: Add a remote storage location:
+
+```bash
+dvc remote add -d myremote <url>
+```
+
+### Authentication errors
+
+```terminal
+ERROR: failed to push data to the cloud
+```
+
+**Solution**: Configure credentials for your remote storage. Example for S3:
+
+```bash
+dvc remote modify myremote access_key_id YOUR_ACCESS_KEY
+dvc remote modify myremote secret_access_key YOUR_SECRET_KEY
+```
+
+### Network issues
+
+If push fails due to network issues, simply run `dvc push` again. DVC will resume from where it left off.
+
+## Performance tips
+
+<Tip>
+**Increase parallelism** - Use `--jobs` to speed up uploads, especially for many small files:
+```bash
+dvc push --jobs 16
+```
+</Tip>
+
+<Tip>
+**Push specific targets** - Instead of pushing everything, push only what changed:
+```bash
+dvc status --cloud  # Check what needs pushing
+dvc push data/changed_file.csv.dvc
+```
+</Tip>
+
+<Tip>
+**Use cloud-native storage** - For best performance, use storage in the same cloud region as your compute.
+</Tip>
+
+## Best practices
+
+1. **Always push before git push**: Ensure data is backed up before publishing code
+2. **Use --all-branches periodically**: Backup experiment data before cleaning up branches
+3. **Configure credentials securely**: Use environment variables or IAM roles instead of storing credentials in config
+4. **Monitor costs**: Cloud storage and transfer costs can add up with large datasets
+
+## Related commands
+
+- `dvc pull` - Download data from remote storage
+- `dvc fetch` - Download to cache without checking out
+- `dvc status` - Check sync status with remote
+- `dvc remote` - Manage remote storage locations

@@ -1,0 +1,192 @@
+---
+title: dvc add
+description: Track data files or directories with DVC
+---
+
+## Synopsis
+
+```bash
+dvc add [options] <targets>...
+```
+
+## Description
+
+The `dvc add` command is used to start tracking data files or directories with DVC. When you add a file or directory, DVC:
+
+1. Computes the hash of the file/directory contents
+2. Moves the data to the DVC cache (unless `--no-commit` is used)
+3. Creates a `.dvc` file that references the cached data
+4. Adds the original file to `.gitignore` (so Git doesn't track it)
+
+This is the primary way to start versioning your data with DVC. The `.dvc` files should be committed to Git, while the actual data files remain in your workspace but are linked to the cache.
+
+<Note>
+DVC uses file links (reflinks, hardlinks, or symlinks depending on your system) to avoid duplicating data between the cache and workspace.
+</Note>
+
+## Options
+
+<ParamField path="targets" type="path" required>
+  Input files or directories to add. You can specify multiple targets separated by spaces.
+  
+  ```bash
+  dvc add data/raw.csv models/model.pkl
+  ```
+</ParamField>
+
+<ParamField path="--no-commit" type="boolean" default="false">
+  Don't put files/directories into cache. Only creates the `.dvc` file without moving data to the cache.
+  
+  <Tip>
+  Useful when you want to create the tracking structure but defer the actual caching operation.
+  </Tip>
+</ParamField>
+
+<ParamField path="--glob" type="boolean" default="false">
+  Allows targets containing shell-style wildcards (e.g., `*.csv`, `data/**/*.txt`).
+  
+  ```bash
+  dvc add --glob "data/*.csv"
+  ```
+</ParamField>
+
+<ParamField path="-o, --out" type="path">
+  Destination path to put files to. This option changes where the output file is created.
+  
+  ```bash
+  dvc add data.csv --out processed/data.csv
+  ```
+  
+  <Warning>
+  Cannot be used with multiple targets or with `--glob`.
+  </Warning>
+</ParamField>
+
+<ParamField path="--to-remote" type="boolean" default="false">
+  Download it directly to the remote storage instead of to the local cache.
+  
+  <Info>
+  This is useful for handling large files that don't fit in your local cache. The file is tracked by DVC but stored only in remote storage.
+  </Info>
+</ParamField>
+
+<ParamField path="-r, --remote" type="string">
+  Remote storage to download to. Only used with `--to-remote`.
+  
+  ```bash
+  dvc add large-file.bin --to-remote --remote myremote
+  ```
+</ParamField>
+
+<ParamField path="--remote-jobs" type="integer" default="4 * cpu_count()">
+  Number of jobs to run simultaneously when pushing data to remote. Only used with `--to-remote`.
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Override local file or folder if it exists.
+</ParamField>
+
+<ParamField path="--no-relink" type="boolean" default="false">
+  Don't recreate links from cache to workspace after adding.
+</ParamField>
+
+## Examples
+
+### Basic usage
+
+Track a single data file:
+
+```bash
+dvc add data/raw.csv
+```
+
+```terminal
+Adding...
+100% Adding...|████████████████████████████████|1/1 [00:00,  1.23file/s]
+```
+
+This creates `data/raw.csv.dvc` and adds `data/raw.csv` to `.gitignore`.
+
+### Track a directory
+
+Track an entire directory of data:
+
+```bash
+dvc add data/images/
+```
+
+```terminal
+Adding...
+100% Adding...|████████████████████████████████|1/1 [00:03,  3.45s/file]
+```
+
+Creates `data/images.dvc` that tracks all files in the directory.
+
+### Track multiple files
+
+Add multiple files at once:
+
+```bash
+dvc add data/train.csv data/test.csv models/baseline.pkl
+```
+
+```terminal
+Adding...
+100% Adding...|████████████████████████████████|3/3 [00:01,  2.15file/s]
+```
+
+### Using wildcards
+
+Track all CSV files in a directory:
+
+```bash
+dvc add --glob "data/*.csv"
+```
+
+### Add without committing to cache
+
+Create `.dvc` file without moving data to cache:
+
+```bash
+dvc add --no-commit large-dataset/
+```
+
+You can commit the data later with `dvc commit`.
+
+### Add directly to remote storage
+
+For very large files, add directly to remote storage:
+
+```bash
+dvc add huge-file.bin --to-remote --remote s3storage
+```
+
+<Warning>
+This bypasses the local cache, so the file won't be available locally unless you run `dvc pull`.
+</Warning>
+
+## Example workflow
+
+A typical workflow when adding data:
+
+```bash
+# Add your data file
+dvc add data/raw.csv
+
+# Commit the .dvc file to Git
+git add data/raw.csv.dvc data/.gitignore
+git commit -m "Add raw dataset"
+
+# Push data to remote storage
+dvc push
+
+# Push Git commits
+git push
+```
+
+## Related commands
+
+- `dvc commit` - Record changes to tracked files
+- `dvc push` - Upload tracked files to remote storage
+- `dvc checkout` - Checkout data files from cache
+- `dvc remove` - Stop tracking files/directories

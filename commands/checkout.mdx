@@ -1,0 +1,251 @@
+---
+title: dvc checkout
+description: Checkout data files from cache
+---
+
+## Synopsis
+
+```bash
+dvc checkout [options] [<targets>...]
+```
+
+## Description
+
+The `dvc checkout` command updates the workspace to match the data files specified in `.dvc` files. It restores or updates data files from the DVC cache to your workspace.
+
+This command is typically used:
+
+- After switching Git branches to sync data files
+- After pulling changes from Git that update `.dvc` files
+- To restore files that were deleted or modified
+- To recreate file links between cache and workspace
+
+When you run `dvc checkout`, DVC:
+
+1. Reads the hash values from `.dvc` files or `dvc.lock`
+2. Finds the corresponding data in the local cache
+3. Links (or copies) the cached files to your workspace
+4. Updates or deletes files as needed to match the `.dvc` specifications
+
+<Info>
+If data is missing from the cache, use `dvc fetch` or `dvc pull` to download it from remote storage first.
+</Info>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names. If not specified, checks out all tracked data.
+  
+  ```bash
+  dvc checkout data/raw.csv models/
+  ```
+</ParamField>
+
+<ParamField path="--summary" type="boolean" default="false">
+  Show summary of the changes instead of detailed file-by-file output.
+  
+  ```bash
+  dvc checkout --summary
+  ```
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Checkout all dependencies of the specified target. Useful when working with DVC pipelines.
+  
+  ```bash
+  dvc checkout --with-deps train.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Checkout all subdirectories of the specified directory.
+  
+  ```bash
+  dvc checkout --recursive data/
+  ```
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Do not prompt when removing working directory files. Forces checkout even if it means overwriting modified files.
+  
+  <Warning>
+  Use with caution as this will discard any local modifications to tracked files.
+  </Warning>
+</ParamField>
+
+<ParamField path="--relink" type="boolean" default="false">
+  Recreate links or copies from cache to workspace. Useful if you've changed cache link types in your configuration.
+  
+  ```bash
+  dvc checkout --relink
+  ```
+</ParamField>
+
+<ParamField path="--allow-missing" type="boolean" default="false">
+  Ignore errors if some of the files or directories are missing from cache.
+  
+  <Tip>
+  Useful in CI/CD environments where not all data needs to be present.
+  </Tip>
+</ParamField>
+
+## Examples
+
+### Basic checkout
+
+Checkout all tracked data files:
+
+```bash
+dvc checkout
+```
+
+```terminal
+M       data/train.csv
+A       data/test.csv
+```
+
+Output legend:
+- `M` - Modified (file was updated)
+- `A` - Added (new file was created)
+- `D` - Deleted (file was removed)
+
+### Checkout after switching branches
+
+A common workflow when switching Git branches:
+
+```bash
+# Switch to a different branch
+git checkout experiment-branch
+
+# Checkout the corresponding data
+dvc checkout
+```
+
+```terminal
+M       models/model.pkl
+M       data/processed/features.csv
+```
+
+### Checkout specific files
+
+Checkout only specific targets:
+
+```bash
+dvc checkout data/raw.csv models/model.pkl
+```
+
+### Show summary
+
+Get a high-level summary instead of file-by-file details:
+
+```bash
+dvc checkout --summary
+```
+
+```terminal
+2 files modified, 1 file added
+```
+
+### Force checkout
+
+Overwrite local changes and force checkout:
+
+```bash
+dvc checkout --force
+```
+
+<Warning>
+This will discard any uncommitted changes to tracked files.
+</Warning>
+
+### Relink files
+
+Recreate links from cache (useful after changing cache configuration):
+
+```bash
+dvc checkout --relink
+```
+
+```terminal
+M       data/train.csv
+M       data/test.csv
+Relinked successfully
+```
+
+### Recursive checkout
+
+Checkout all files in a directory and its subdirectories:
+
+```bash
+dvc checkout --recursive data/
+```
+
+## Example workflows
+
+### Workflow 1: After pulling Git changes
+
+```bash
+# Pull latest Git changes
+git pull
+
+# Update data files to match
+dvc checkout
+```
+
+### Workflow 2: Restore deleted data
+
+```bash
+# Accidentally deleted a tracked file
+rm data/important.csv
+
+# Restore it from cache
+dvc checkout data/important.csv
+```
+
+### Workflow 3: Working with pipelines
+
+```bash
+# Checkout a pipeline stage and all its dependencies
+dvc checkout --with-deps train.dvc
+```
+
+## Handling missing files
+
+If files are missing from cache, you'll see an error:
+
+```terminal
+ERROR: failed to checkout data/large.csv - file not in cache
+```
+
+To fix this, fetch the data from remote storage:
+
+```bash
+# Fetch missing data from remote
+dvc fetch
+
+# Now checkout
+dvc checkout
+```
+
+Or use `dvc pull` to do both in one command:
+
+```bash
+dvc pull
+```
+
+## Performance tips
+
+<Tip>
+**Use targets** - If you only need specific files, specify them as targets rather than checking out everything. This is faster for large projects.
+</Tip>
+
+<Tip>
+**Configure cache types** - DVC can use reflinks (copy-on-write) on supported filesystems, which makes checkout nearly instantaneous. Check your cache configuration with `dvc cache dir`.
+</Tip>
+
+## Related commands
+
+- `dvc fetch` - Download files from remote storage to cache
+- `dvc pull` - Fetch and checkout in one command
+- `dvc commit` - Save changes to tracked files
+- `dvc status` - Show which files have changed

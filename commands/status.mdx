@@ -1,0 +1,355 @@
+---
+title: dvc status
+description: Show changed stages and compare local cache with remote storage
+---
+
+## Synopsis
+
+```bash
+dvc status [options] [<targets>...]
+```
+
+## Description
+
+The `dvc status` command shows the status of your DVC-tracked files and pipeline stages. It helps you understand:
+
+- Which tracked files have been modified in your workspace
+- Which pipeline stages need to be reproduced
+- Differences between local cache and remote storage (with `--cloud` option)
+- What data needs to be pushed or pulled
+
+The command operates in two main modes:
+
+1. **Local mode** (default): Shows which files/stages have changed in your workspace
+2. **Cloud mode** (`--cloud`): Compares your local cache with remote storage
+
+<Info>
+Think of `dvc status` as similar to `git status` - it shows what has changed without making any modifications.
+</Info>
+
+## Options
+
+<ParamField path="targets" type="path">
+  Limit command scope to specific tracked files/directories, `.dvc` files, or stage names.
+  
+  ```bash
+  dvc status data/train.csv models/
+  ```
+</ParamField>
+
+<ParamField path="-q, --quiet" type="boolean" default="false">
+  Suppresses all output. Exit with 0 if pipelines are up to date, otherwise 1. Useful for scripts and CI/CD.
+  
+  ```bash
+  dvc status --quiet && echo "All up to date"
+  ```
+</ParamField>
+
+<ParamField path="-c, --cloud" type="boolean" default="false">
+  Show status of local cache compared to remote repository. Shows what needs to be pushed or pulled.
+  
+  ```bash
+  dvc status --cloud
+  ```
+</ParamField>
+
+<ParamField path="-r, --remote" type="string">
+  Remote storage to compare local cache to. Used with `--cloud`.
+  
+  ```bash
+  dvc status --cloud --remote s3storage
+  ```
+</ParamField>
+
+<ParamField path="-j, --jobs" type="integer" default="4 * cpu_count()">
+  Number of jobs to run simultaneously when checking status.
+</ParamField>
+
+<ParamField path="-a, --all-branches" type="boolean" default="false">
+  Show status for all Git branches. Used with `--cloud`.
+  
+  ```bash
+  dvc status --cloud --all-branches
+  ```
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="boolean" default="false">
+  Show status for all Git tags. Used with `--cloud`.
+</ParamField>
+
+<ParamField path="-A, --all-commits" type="boolean" default="false">
+  Show status for all Git commits. Used with `--cloud`.
+  
+  <Warning>
+  This can be very slow for repositories with many commits.
+  </Warning>
+</ParamField>
+
+<ParamField path="-d, --with-deps" type="boolean" default="false">
+  Show status for all dependencies of the specified target.
+  
+  ```bash
+  dvc status --with-deps train.dvc
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Show status of all stages in the specified directory.
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Show status in JSON format. Useful for parsing in scripts.
+  
+  ```bash
+  dvc status --json
+  ```
+</ParamField>
+
+<ParamField path="--no-updates" type="boolean" default="false">
+  Ignore updates to imported data.
+</ParamField>
+
+## Examples
+
+### Basic status check
+
+Check the status of all tracked data:
+
+```bash
+dvc status
+```
+
+```terminal
+Data and pipelines are up to date.
+```
+
+Or if there are changes:
+
+```terminal
+train.dvc:
+        changed deps:
+                modified:           data/raw.csv
+        changed outs:
+                not in cache:       models/model.pkl
+```
+
+### Check specific files
+
+Check status of specific targets:
+
+```bash
+dvc status data/processed.csv.dvc
+```
+
+```terminal
+data/processed.csv.dvc:
+        changed outs:
+                modified:           data/processed.csv
+```
+
+### Cloud status
+
+Compare local cache with remote storage:
+
+```bash
+dvc status --cloud
+```
+
+```terminal
+new:            data/train.csv
+new:            models/model.pkl
+```
+
+This shows files that exist locally but haven't been pushed to remote storage.
+
+Or if pulling is needed:
+
+```terminal
+deleted:        data/old_dataset.csv
+new:            data/new_dataset.csv
+```
+
+### Compare with specific remote
+
+```bash
+dvc status --cloud --remote myremote
+```
+
+```terminal
+Cache and remote 'myremote' are in sync.
+```
+
+### Check pipeline dependencies
+
+Check a stage and all its dependencies:
+
+```bash
+dvc status --with-deps evaluate.dvc
+```
+
+```terminal
+preprocess.dvc:
+        changed deps:
+                modified:           data/raw.csv
+
+train.dvc:
+        changed deps:
+                modified:           data/processed.csv
+```
+
+### JSON output
+
+Get status in JSON format for programmatic use:
+
+```bash
+dvc status --json
+```
+
+```json
+{
+  "train.dvc": {
+    "changed deps": {
+      "data/raw.csv": "modified"
+    },
+    "changed outs": {
+      "models/model.pkl": "not in cache"
+    }
+  }
+}
+```
+
+### Quiet mode for scripting
+
+Use in CI/CD or scripts:
+
+```bash
+if dvc status --quiet; then
+    echo "Everything is up to date"
+else
+    echo "Changes detected, running pipeline"
+    dvc repro
+fi
+```
+
+### Check all branches
+
+See what needs to be synced across all branches:
+
+```bash
+dvc status --cloud --all-branches
+```
+
+```terminal
+main:
+        new:            models/model_v1.pkl
+
+experiment:
+        new:            models/model_v2.pkl
+        new:            data/experiment_data.csv
+```
+
+## Understanding status output
+
+### Local mode status states
+
+| State | Meaning |
+|-------|----------|
+| `modified` | File content has changed |
+| `not in cache` | File is tracked but not in cache (needs `dvc commit`) |
+| `deleted` | File has been deleted from workspace |
+| `changed deps` | Dependencies of a stage have changed |
+| `changed outs` | Outputs of a stage have changed |
+
+### Cloud mode status states
+
+| State | Meaning |
+|-------|----------|
+| `new` | File is in local cache but not in remote (need to `dvc push`) |
+| `deleted` | File is in remote but not in local cache (need to `dvc pull`) |
+
+## Example workflows
+
+### Workflow 1: Before committing
+
+```bash
+# Check what has changed
+dvc status
+
+# Commit changes if needed
+dvc commit
+
+# Update Git
+git add *.dvc
+git commit -m "Update data"
+```
+
+### Workflow 2: Syncing with remote
+
+```bash
+# Check what needs to be synced
+dvc status --cloud
+
+# Push new data to remote
+dvc push
+
+# Verify sync
+dvc status --cloud
+```
+
+### Workflow 3: Pipeline development
+
+```bash
+# Check pipeline status
+dvc status
+
+# If dependencies changed, reproduce
+if ! dvc status --quiet; then
+    dvc repro
+fi
+
+# Check cloud sync
+dvc status --cloud
+```
+
+## When nothing changes
+
+If everything is up to date, you'll see:
+
+```terminal
+Data and pipelines are up to date.
+```
+
+Or for cloud mode:
+
+```terminal
+Cache and remote 'origin' are in sync.
+```
+
+Or if the project is new:
+
+```terminal
+There are no data or pipelines tracked in this project yet.
+See https://dvc.org/doc/start to get started!
+```
+
+## Performance tips
+
+<Tip>
+**Use targets** - Check specific targets rather than the entire project to get faster results.
+</Tip>
+
+<Tip>
+**Adjust jobs** - Use `--jobs` to control parallelism. More jobs = faster but more resource-intensive.
+</Tip>
+
+<Warning>
+**Avoid --all-commits** - This option can be extremely slow for large repositories. Use `--all-branches` or `--all-tags` instead when possible.
+</Warning>
+
+## Related commands
+
+- `dvc diff` - Show detailed differences between commits
+- `dvc commit` - Record changes to tracked files
+- `dvc push` - Upload data to remote storage
+- `dvc pull` - Download data from remote storage
+- `dvc checkout` - Update workspace from cache

@@ -1,0 +1,912 @@
+---
+title: Remote Storage Configuration
+description: Complete guide to configuring remote storage backends in DVC
+---
+
+DVC supports various remote storage backends for storing and sharing data. This guide covers all available storage options and their configuration parameters.
+
+## Adding a Remote
+
+Add a remote storage location:
+
+```bash
+dvc remote add -d myremote s3://mybucket/path
+```
+
+The `-d` flag sets it as the default remote. Configuration is stored in `.dvc/config`:
+
+```ini
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = s3://mybucket/path
+```
+
+<Info>
+  Use `dvc remote add` to configure remotes, or edit `.dvc/config` directly.
+</Info>
+
+## Common Configuration
+
+These options apply to all remote types:
+
+<ParamField path="url" type="string" required>
+  Remote storage URL. Format depends on the storage type:
+  - S3: `s3://bucket/path`
+  - GCS: `gs://bucket/path`
+  - Azure: `azure://container/path`
+  - SSH: `ssh://user@host:/path`
+  - Local: `/path/to/storage` or `file:///path/to/storage`
+</ParamField>
+
+<ParamField path="jobs" type="integer" default="4">
+  Number of parallel jobs for upload/download operations.
+  Higher values speed up transfers but use more resources.
+</ParamField>
+
+<ParamField path="checksum_jobs" type="integer" default="4">
+  Number of parallel jobs for checksum calculation.
+</ParamField>
+
+<ParamField path="version_aware" type="boolean" default="false">
+  Enable version-aware operations for supported cloud storage.
+  Useful for S3, GCS, and Azure with versioning enabled.
+</ParamField>
+
+<ParamField path="worktree" type="boolean" default="false">
+  Enable worktree mode for the remote.
+</ParamField>
+
+## Local & File Remotes
+
+Local filesystem or network-mounted storage.
+
+### Configuration
+
+```bash
+# Local directory
+dvc remote add storage /mnt/shared/dvc-storage
+
+# Network share (Linux/Mac)
+dvc remote add storage /mnt/nas/dvc-storage
+
+# Windows network share
+dvc remote add storage \\server\share\dvc-storage
+
+# Relative path (relative to .dvc directory)
+dvc remote add storage ../../shared-storage
+```
+
+### Parameters
+
+<ParamField path="type" type="string">
+  Cache link type: `reflink`, `hardlink`, `symlink`, or `copy`.
+  
+  - `reflink`: Copy-on-write (fastest, limited support)
+  - `hardlink`: Hard links (fast, same filesystem required)
+  - `symlink`: Symbolic links
+  - `copy`: Full copy (slowest, most compatible)
+  
+  Can specify multiple as comma-separated list (tried in order).
+</ParamField>
+
+<ParamField path="shared" type="string">
+  Set to `group` to make cache group-writable.
+  Useful for shared storage accessed by multiple users.
+</ParamField>
+
+<ParamField path="slow_link_warning" type="boolean" default="true">
+  Warn when using slow link types (copy).
+</ParamField>
+
+<ParamField path="verify" type="boolean" default="false">
+  Verify checksums after transfer.
+</ParamField>
+
+### Example
+
+```ini
+['remote "local"']
+    url = /mnt/shared/dvc-cache
+    type = hardlink,copy
+    shared = group
+```
+
+## Amazon S3
+
+Amazon S3 and S3-compatible storage (MinIO, DigitalOcean Spaces, etc.).
+
+### Basic Setup
+
+```bash
+dvc remote add s3remote s3://mybucket/path
+dvc remote modify s3remote region us-east-1
+```
+
+### Authentication Parameters
+
+<ParamField path="access_key_id" type="string">
+  AWS access key ID. Alternatively, set `AWS_ACCESS_KEY_ID` environment variable.
+</ParamField>
+
+<ParamField path="secret_access_key" type="string">
+  AWS secret access key. Alternatively, set `AWS_SECRET_ACCESS_KEY` environment variable.
+  
+  <Warning>
+    Store credentials in `.dvc/config.local` (git-ignored) or use environment variables.
+  </Warning>
+</ParamField>
+
+<ParamField path="session_token" type="string">
+  AWS session token for temporary credentials.
+</ParamField>
+
+<ParamField path="profile" type="string">
+  AWS profile name from `~/.aws/credentials`.
+</ParamField>
+
+<ParamField path="credentialpath" type="string">
+  Path to custom AWS credentials file.
+</ParamField>
+
+<ParamField path="configpath" type="string">
+  Path to custom AWS config file.
+</ParamField>
+
+<ParamField path="allow_anonymous_login" type="boolean" default="false">
+  Allow anonymous access to public buckets.
+</ParamField>
+
+### Region & Endpoint
+
+<ParamField path="region" type="string">
+  AWS region (e.g., `us-west-2`, `eu-central-1`).
+</ParamField>
+
+<ParamField path="endpointurl" type="string">
+  Custom S3 endpoint URL for S3-compatible services:
+  - MinIO: `http://localhost:9000`
+  - DigitalOcean: `https://nyc3.digitaloceanspaces.com`
+</ParamField>
+
+### Connection Settings
+
+<ParamField path="use_ssl" type="boolean" default="true">
+  Use HTTPS for connections.
+</ParamField>
+
+<ParamField path="ssl_verify" type="boolean | string" default="true">
+  Verify SSL certificates. Set to `false` to disable or path to CA bundle.
+</ParamField>
+
+<ParamField path="read_timeout" type="integer">
+  Read timeout in seconds.
+</ParamField>
+
+<ParamField path="connect_timeout" type="integer">
+  Connection timeout in seconds.
+</ParamField>
+
+### Encryption
+
+<ParamField path="sse" type="string">
+  Server-side encryption algorithm: `AES256` or `aws:kms`.
+</ParamField>
+
+<ParamField path="sse_kms_key_id" type="string">
+  KMS key ID for KMS encryption.
+</ParamField>
+
+<ParamField path="sse_customer_algorithm" type="string">
+  Customer-provided encryption algorithm.
+</ParamField>
+
+<ParamField path="sse_customer_key" type="string">
+  Customer-provided encryption key.
+</ParamField>
+
+### Access Control
+
+<ParamField path="acl" type="string">
+  Canned ACL: `private`, `public-read`, `public-read-write`, `authenticated-read`, etc.
+</ParamField>
+
+<ParamField path="grant_read" type="string">
+  Grant read permissions (grantee format: `id=xxx` or `emailAddress=xxx`).
+</ParamField>
+
+<ParamField path="grant_read_acp" type="string">
+  Grant read ACP permissions.
+</ParamField>
+
+<ParamField path="grant_write_acp" type="string">
+  Grant write ACP permissions.
+</ParamField>
+
+<ParamField path="grant_full_control" type="string">
+  Grant full control permissions.
+</ParamField>
+
+### Performance
+
+<ParamField path="cache_regions" type="boolean">
+  Cache region information for faster bucket access.
+</ParamField>
+
+### Complete Example
+
+<Accordion title="S3 with encryption and custom ACL">
+```bash
+# Add remote
+dvc remote add s3storage s3://my-dvc-bucket/project
+
+# Configure region and encryption
+dvc remote modify s3storage region us-west-2
+dvc remote modify s3storage sse AES256
+dvc remote modify s3storage acl bucket-owner-full-control
+
+# Set credentials (local config, git-ignored)
+dvc config --local remote.s3storage.access_key_id AKIAIOSFODNN7EXAMPLE
+dvc config --local remote.s3storage.secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+Resulting `.dvc/config`:
+```ini
+['remote "s3storage"']
+    url = s3://my-dvc-bucket/project
+    region = us-west-2
+    sse = AES256
+    acl = bucket-owner-full-control
+```
+</Accordion>
+
+<Accordion title="MinIO (S3-compatible)">
+```bash
+dvc remote add minio s3://my-bucket/dvc
+dvc remote modify minio endpointurl http://localhost:9000
+dvc remote modify minio access_key_id minioadmin
+dvc remote modify minio secret_access_key minioadmin
+```
+</Accordion>
+
+## Google Cloud Storage (GCS)
+
+Google Cloud Storage backend.
+
+### Basic Setup
+
+```bash
+dvc remote add gsremote gs://mybucket/path
+```
+
+### Authentication
+
+<ParamField path="credentialpath" type="string">
+  Path to service account JSON key file.
+  Alternatively, set `GOOGLE_APPLICATION_CREDENTIALS` environment variable.
+</ParamField>
+
+<ParamField path="projectname" type="string">
+  Google Cloud project name.
+</ParamField>
+
+<ParamField path="allow_anonymous_login" type="boolean" default="false">
+  Allow anonymous access to public buckets.
+</ParamField>
+
+### Endpoint
+
+<ParamField path="endpointurl" type="string">
+  Custom GCS endpoint URL (for emulators or compatible services).
+</ParamField>
+
+### Example
+
+```bash
+dvc remote add gcs gs://my-dvc-bucket/data
+dvc config --local remote.gcs.credentialpath /path/to/service-account.json
+dvc remote modify gcs projectname my-gcp-project
+```
+
+## Microsoft Azure Blob Storage
+
+Azure Blob Storage backend.
+
+### Basic Setup
+
+```bash
+dvc remote add azure azure://mycontainer/path
+```
+
+### Authentication Methods
+
+<ParamField path="connection_string" type="string">
+  Azure storage connection string.
+  
+  Format: `DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...`
+</ParamField>
+
+<ParamField path="account_name" type="string">
+  Storage account name.
+</ParamField>
+
+<ParamField path="account_key" type="string">
+  Storage account key.
+</ParamField>
+
+<ParamField path="sas_token" type="string">
+  Shared Access Signature token.
+</ParamField>
+
+<ParamField path="tenant_id" type="string">
+  Azure AD tenant ID for service principal authentication.
+</ParamField>
+
+<ParamField path="client_id" type="string">
+  Azure AD client ID.
+</ParamField>
+
+<ParamField path="client_secret" type="string">
+  Azure AD client secret.
+</ParamField>
+
+<ParamField path="allow_anonymous_login" type="boolean" default="false">
+  Allow anonymous access.
+</ParamField>
+
+### Credential Chain Control
+
+<ParamField path="exclude_environment_credential" type="boolean">
+  Exclude environment variables from credential chain.
+</ParamField>
+
+<ParamField path="exclude_visual_studio_code_credential" type="boolean">
+  Exclude VS Code credentials.
+</ParamField>
+
+<ParamField path="exclude_shared_token_cache_credential" type="boolean">
+  Exclude shared token cache.
+</ParamField>
+
+<ParamField path="exclude_managed_identity_credential" type="boolean">
+  Exclude managed identity credentials.
+</ParamField>
+
+### Connection Settings
+
+<ParamField path="timeout" type="integer">
+  General timeout in seconds.
+</ParamField>
+
+<ParamField path="read_timeout" type="integer">
+  Read timeout in seconds.
+</ParamField>
+
+<ParamField path="connection_timeout" type="integer">
+  Connection timeout in seconds.
+</ParamField>
+
+### Example
+
+<Accordion title="Using connection string">
+```bash
+dvc remote add azure azure://mycontainer
+dvc config --local remote.azure.connection_string "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=..."
+```
+</Accordion>
+
+<Accordion title="Using service principal">
+```bash
+dvc remote add azure azure://mycontainer/dvc
+dvc remote modify azure account_name mystorageaccount
+dvc config --local remote.azure.tenant_id YOUR_TENANT_ID
+dvc config --local remote.azure.client_id YOUR_CLIENT_ID
+dvc config --local remote.azure.client_secret YOUR_CLIENT_SECRET
+```
+</Accordion>
+
+## SSH / SFTP
+
+Remote storage over SSH/SFTP.
+
+### Basic Setup
+
+```bash
+dvc remote add sshremote ssh://user@example.com:/path/to/storage
+```
+
+### Authentication
+
+<ParamField path="user" type="string">
+  SSH username.
+</ParamField>
+
+<ParamField path="password" type="string">
+  SSH password (not recommended, use key-based auth).
+</ParamField>
+
+<ParamField path="ask_password" type="boolean">
+  Prompt for password interactively.
+</ParamField>
+
+<ParamField path="keyfile" type="string">
+  Path to SSH private key file.
+</ParamField>
+
+<ParamField path="passphrase" type="string">
+  Passphrase for encrypted private key.
+</ParamField>
+
+<ParamField path="ask_passphrase" type="boolean">
+  Prompt for passphrase interactively.
+</ParamField>
+
+<ParamField path="gss_auth" type="boolean">
+  Use GSS-API authentication.
+</ParamField>
+
+<ParamField path="allow_agent" type="boolean">
+  Allow SSH agent for authentication.
+</ParamField>
+
+### Connection Settings
+
+<ParamField path="port" type="integer" default="22">
+  SSH port number.
+</ParamField>
+
+<ParamField path="timeout" type="integer">
+  Connection timeout in seconds.
+</ParamField>
+
+<ParamField path="max_sessions" type="integer">
+  Maximum number of concurrent SSH sessions.
+</ParamField>
+
+### Cache Settings
+
+<ParamField path="type" type="string">
+  Cache link type on remote: `reflink`, `hardlink`, `symlink`, or `copy`.
+</ParamField>
+
+### Example
+
+```bash
+dvc remote add ssh ssh://user@server.com:/data/dvc-storage
+dvc remote modify ssh port 2222
+dvc remote modify ssh keyfile ~/.ssh/id_rsa_dvc
+```
+
+## HDFS
+
+Hadoop Distributed File System.
+
+### Basic Setup
+
+```bash
+dvc remote add hdfsremote hdfs://namenode:8020/path/to/storage
+```
+
+### Parameters
+
+<ParamField path="user" type="string">
+  HDFS username.
+</ParamField>
+
+<ParamField path="kerb_ticket" type="string">
+  Path to Kerberos ticket cache file.
+</ParamField>
+
+<ParamField path="replication" type="integer">
+  HDFS replication factor.
+</ParamField>
+
+## WebHDFS
+
+Web-based HDFS access.
+
+### Basic Setup
+
+```bash
+dvc remote add webhdfs webhdfs://namenode:50070/path/to/storage
+```
+
+### Authentication
+
+<ParamField path="user" type="string">
+  WebHDFS username.
+</ParamField>
+
+<ParamField path="password" type="string">
+  WebHDFS password.
+</ParamField>
+
+<ParamField path="kerberos" type="boolean">
+  Use Kerberos authentication.
+</ParamField>
+
+<ParamField path="kerberos_principal" type="string">
+  Kerberos principal name.
+</ParamField>
+
+<ParamField path="token" type="string">
+  Delegation token.
+</ParamField>
+
+### Settings
+
+<ParamField path="use_https" type="boolean">
+  Use HTTPS instead of HTTP.
+</ParamField>
+
+<ParamField path="ssl_verify" type="boolean | string">
+  Verify SSL certificates.
+</ParamField>
+
+<ParamField path="proxy_to" type="string">
+  Proxy to specific DataNode.
+</ParamField>
+
+<ParamField path="data_proxy_target" type="string">
+  Target for data proxy operations.
+</ParamField>
+
+## Alibaba OSS
+
+Alibaba Cloud Object Storage Service.
+
+### Basic Setup
+
+```bash
+dvc remote add oss oss://mybucket/path
+```
+
+### Authentication
+
+<ParamField path="oss_key_id" type="string">
+  OSS access key ID.
+</ParamField>
+
+<ParamField path="oss_key_secret" type="string">
+  OSS access key secret.
+</ParamField>
+
+<ParamField path="oss_endpoint" type="string">
+  OSS endpoint URL (e.g., `oss-cn-hangzhou.aliyuncs.com`).
+</ParamField>
+
+### Example
+
+```bash
+dvc remote add oss oss://my-bucket/dvc-storage
+dvc remote modify oss oss_endpoint oss-cn-beijing.aliyuncs.com
+dvc config --local remote.oss.oss_key_id YOUR_KEY_ID
+dvc config --local remote.oss.oss_key_secret YOUR_KEY_SECRET
+```
+
+## Google Drive
+
+Google Drive backend (experimental).
+
+### Basic Setup
+
+```bash
+dvc remote add gdrive gdrive://folder-id
+```
+
+### Authentication
+
+<ParamField path="gdrive_client_id" type="string">
+  Google OAuth client ID.
+</ParamField>
+
+<ParamField path="gdrive_client_secret" type="string">
+  Google OAuth client secret.
+</ParamField>
+
+<ParamField path="gdrive_user_credentials_file" type="string">
+  Path to user credentials file.
+</ParamField>
+
+### Service Account
+
+<ParamField path="gdrive_use_service_account" type="boolean">
+  Use service account for authentication.
+</ParamField>
+
+<ParamField path="gdrive_service_account_json_file_path" type="string">
+  Path to service account JSON file.
+</ParamField>
+
+<ParamField path="gdrive_service_account_user_email" type="string">
+  Email for service account impersonation.
+</ParamField>
+
+### Settings
+
+<ParamField path="gdrive_trash_only" type="boolean" default="false">
+  Move files to trash instead of permanent deletion.
+</ParamField>
+
+<ParamField path="gdrive_acknowledge_abuse" type="boolean" default="false">
+  Acknowledge abuse risk when downloading flagged files.
+</ParamField>
+
+## HTTP / HTTPS
+
+Read-only remote over HTTP(S).
+
+### Basic Setup
+
+```bash
+dvc remote add httpremote https://example.com/data
+```
+
+### Authentication
+
+<ParamField path="auth" type="string">
+  Authentication method: `basic`, `digest`, or `custom`.
+</ParamField>
+
+<ParamField path="user" type="string">
+  Username for basic/digest auth.
+</ParamField>
+
+<ParamField path="password" type="string">
+  Password for authentication.
+</ParamField>
+
+<ParamField path="ask_password" type="boolean">
+  Prompt for password interactively.
+</ParamField>
+
+<ParamField path="custom_auth_header" type="string">
+  Custom authentication header value.
+  
+  Example: `Bearer YOUR_TOKEN`
+</ParamField>
+
+### Connection Settings
+
+<ParamField path="ssl_verify" type="boolean | string">
+  Verify SSL certificates. Can be `true`, `false`, or path to CA bundle.
+</ParamField>
+
+<ParamField path="method" type="string">
+  HTTP method to use (default: GET).
+</ParamField>
+
+<ParamField path="connect_timeout" type="number">
+  Connection timeout in seconds.
+</ParamField>
+
+<ParamField path="read_timeout" type="number">
+  Read timeout in seconds.
+</ParamField>
+
+## WebDAV / WebDAVs
+
+WebDAV protocol support.
+
+### Basic Setup
+
+```bash
+dvc remote add webdav webdavs://example.com/dvc-storage
+```
+
+### Authentication
+
+<ParamField path="user" type="string">
+  Username.
+</ParamField>
+
+<ParamField path="password" type="string">
+  Password.
+</ParamField>
+
+<ParamField path="ask_password" type="boolean">
+  Prompt for password.
+</ParamField>
+
+<ParamField path="token" type="string">
+  Authentication token.
+</ParamField>
+
+<ParamField path="bearer_token_command" type="string">
+  Command to generate bearer token dynamically.
+</ParamField>
+
+<ParamField path="custom_auth_header" type="string">
+  Custom authentication header.
+</ParamField>
+
+### SSL/TLS
+
+<ParamField path="cert_path" type="string">
+  Path to client certificate.
+</ParamField>
+
+<ParamField path="key_path" type="string">
+  Path to client private key.
+</ParamField>
+
+<ParamField path="ssl_verify" type="boolean | string">
+  Verify SSL certificates.
+</ParamField>
+
+<ParamField path="timeout" type="integer">
+  Connection timeout in seconds.
+</ParamField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Store credentials securely">
+    Use `.dvc/config.local` for sensitive data:
+    
+    ```bash
+    # Add remote (tracked by Git)
+    dvc remote add storage s3://bucket/path
+    
+    # Add credentials (git-ignored)
+    dvc config --local remote.storage.access_key_id YOUR_KEY
+    dvc config --local remote.storage.secret_access_key YOUR_SECRET
+    ```
+    
+    Or use environment variables:
+    ```bash
+    export AWS_ACCESS_KEY_ID=YOUR_KEY
+    export AWS_SECRET_ACCESS_KEY=YOUR_SECRET
+    ```
+  </Accordion>
+
+  <Accordion title="Set up multiple remotes">
+    Configure different remotes for different purposes:
+    
+    ```bash
+    # Production storage
+    dvc remote add -d production s3://prod-bucket/data
+    
+    # Backup storage
+    dvc remote add backup gs://backup-bucket/data
+    
+    # Local cache for fast access
+    dvc remote add local /mnt/fast-storage
+    
+    # Push to specific remote
+    dvc push -r backup
+    ```
+  </Accordion>
+
+  <Accordion title="Use IAM roles for cloud storage">
+    When running on cloud instances, use IAM roles instead of access keys:
+    
+    **AWS EC2:**
+    ```bash
+    # No credentials needed - uses instance profile
+    dvc remote add storage s3://bucket/path
+    ```
+    
+    **Azure VM:**
+    ```bash
+    # Uses managed identity
+    dvc remote add storage azure://container/path
+    dvc remote modify storage account_name myaccount
+    ```
+  </Accordion>
+
+  <Accordion title="Optimize transfer performance">
+    Adjust job counts based on your network and CPU:
+    
+    ```bash
+    # Increase for fast networks
+    dvc remote modify storage jobs 16
+    dvc remote modify storage checksum_jobs 16
+    
+    # Reduce for slow connections or limited CPU
+    dvc remote modify storage jobs 2
+    dvc remote modify storage checksum_jobs 2
+    ```
+  </Accordion>
+
+  <Accordion title="Enable verification for critical data">
+    For important datasets, enable post-transfer verification:
+    
+    ```bash
+    dvc remote modify storage verify true
+    ```
+    
+    <Warning>
+      Verification doubles the time needed for transfers but ensures data integrity.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Remote Management Commands
+
+```bash
+# List remotes
+dvc remote list
+
+# Add remote
+dvc remote add myremote s3://bucket/path
+
+# Set as default
+dvc remote default myremote
+
+# Modify remote
+dvc remote modify myremote region us-west-2
+
+# Rename remote
+dvc remote rename myremote newname
+
+# Remove remote
+dvc remote remove myremote
+
+# Push to specific remote
+dvc push -r myremote
+
+# Pull from specific remote
+dvc pull -r myremote
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication failures">
+    **Check credentials:**
+    ```bash
+    # Verify config
+    dvc remote list
+    dvc config remote.storage.url
+    
+    # Test connection
+    dvc remote list storage
+    ```
+    
+    **Common issues:**
+    - Expired credentials
+    - Wrong region/endpoint
+    - Missing permissions
+    - Credentials in wrong config level
+  </Accordion>
+
+  <Accordion title="Slow transfers">
+    **Optimize settings:**
+    ```bash
+    # Increase parallelism
+    dvc remote modify storage jobs 16
+    
+    # Check network
+    dvc pull -v  # verbose output
+    ```
+    
+    **Considerations:**
+    - Network bandwidth
+    - Remote storage throughput limits
+    - Number of files vs. file sizes
+  </Accordion>
+
+  <Accordion title="SSL/TLS errors">
+    **Disable verification (not recommended for production):**
+    ```bash
+    dvc remote modify storage ssl_verify false
+    ```
+    
+    **Or provide CA bundle:**
+    ```bash
+    dvc remote modify storage ssl_verify /path/to/ca-bundle.crt
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration Overview" icon="gear" href="/config/overview">
+    Learn about DVC configuration system
+  </Card>
+  <Card title="DVC Files" icon="file" href="/config/dvc-files">
+    Understand DVC file formats
+  </Card>
+</CardGroup>

@@ -1,0 +1,322 @@
+---
+title: dvc stage
+description: Commands to list and create stages in DVC pipelines.
+---
+
+## Synopsis
+
+```bash
+dvc stage <subcommand>
+```
+
+## Description
+
+Stages are the building blocks of DVC pipelines. Each stage represents a data processing step with defined inputs (dependencies), outputs, and a command to execute. The `dvc stage` command provides subcommands to create and list stages in your project.
+
+Stages are typically defined in `dvc.yaml` files and can track:
+- **Dependencies**: Input files, directories, or parameters that the stage depends on
+- **Outputs**: Files or directories produced by the stage
+- **Metrics**: Numeric outputs for model evaluation
+- **Plots**: Data files for visualization
+- **Commands**: Shell commands that process data
+
+## Subcommands
+
+### dvc stage add
+
+Create a new stage in `dvc.yaml`.
+
+```bash
+dvc stage add -n <name> [options] command
+```
+
+<ParamField path="-n, --name" type="string" required>
+  Name of the stage to add. This will be used to reference the stage in `dvc.yaml` and in other DVC commands.
+</ParamField>
+
+<ParamField path="command" type="string" required>
+  Command to execute for this stage. Can be any shell command.
+</ParamField>
+
+#### Options
+
+<ParamField path="-d, --deps" type="path">
+  Declare dependencies for reproducible command. Can be specified multiple times for multiple dependencies. These files will be tracked, and the stage will run when they change.
+  
+  Example: `-d data.csv -d config.json`
+</ParamField>
+
+<ParamField path="-p, --params" type="string">
+  Declare parameter to use as additional dependency. Format: `[<filename>:]<params_list>`.
+  
+  Parameters are read from `params.yaml` by default, or from a specified file.
+  
+  Example: `-p train.epochs,train.lr -p config.yaml:model.layers`
+</ParamField>
+
+<ParamField path="-o, --outs" type="path">
+  Declare output file or directory. Outputs will be cached by DVC and tracked in `dvc.lock`.
+  
+  Example: `-o model.pkl -o results/`
+</ParamField>
+
+<ParamField path="-O, --outs-no-cache" type="path">
+  Declare output file or directory that will NOT be put into DVC cache. Useful for large intermediate files or logs.
+  
+  Example: `-O logs/training.log`
+</ParamField>
+
+<ParamField path="-m, --metrics" type="path">
+  Declare output metrics file. Metrics are tracked as outputs but are optimized for displaying numeric values.
+  
+  Example: `-m metrics.json`
+</ParamField>
+
+<ParamField path="-M, --metrics-no-cache" type="path">
+  Declare output metrics file (do not put into DVC cache).
+</ParamField>
+
+<ParamField path="--plots" type="path">
+  Declare output plot file. Plots are special outputs used for visualization.
+  
+  Example: `--plots plots/accuracy.csv`
+</ParamField>
+
+<ParamField path="--plots-no-cache" type="path">
+  Declare output plot file (do not put into DVC cache).
+</ParamField>
+
+<ParamField path="--outs-persist" type="path">
+  Declare output file or directory that will NOT be removed upon reproduction. Useful for checkpoint files.
+</ParamField>
+
+<ParamField path="--outs-persist-no-cache" type="path">
+  Declare output file or directory that will not be removed upon repro (do not put into DVC cache).
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean">
+  Overwrite existing stage with the same name.
+</ParamField>
+
+<ParamField path="-w, --wdir" type="path">
+  Directory within your repo to run your command in. The command will be executed from this working directory.
+  
+  Example: `--wdir src/`
+</ParamField>
+
+<ParamField path="--always-changed" type="boolean">
+  Always consider this stage as changed. The stage will always run during reproduction, regardless of whether dependencies changed.
+</ParamField>
+
+<ParamField path="--desc" type="string">
+  User description of the stage (optional). This doesn't affect any DVC operations but helps document your pipeline.
+  
+  Example: `--desc "Train neural network model"`
+</ParamField>
+
+<ParamField path="--run" type="boolean">
+  Execute the stage immediately after generating it.
+</ParamField>
+
+### dvc stage list
+
+List stages from one or more pipelines.
+
+```bash
+dvc stage list [options] [targets...]
+```
+
+<ParamField path="targets" type="path[]">
+  Show stages from a `dvc.yaml`/`.dvc` file or a directory. Defaults to `dvc.yaml` in the current directory.
+  
+  Example: `dvc stage list pipelines/train.dvc.yaml`
+</ParamField>
+
+#### Options
+
+<ParamField path="--all" type="boolean">
+  List all of the stages in the repository.
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean">
+  List all stages inside the specified directory recursively.
+</ParamField>
+
+<ParamField path="--name-only" type="boolean">
+  List only stage names without descriptions.
+</ParamField>
+
+<ParamField path="--fail" type="boolean">
+  Fail immediately, do not suppress any syntax errors in stage files.
+</ParamField>
+
+## Examples
+
+### Creating a simple data preparation stage
+
+```bash
+dvc stage add -n prepare \
+  -d raw_data.csv \
+  -o data/prepared.csv \
+  python prepare.py
+```
+
+This creates a stage named `prepare` in `dvc.yaml`:
+
+```yaml
+stages:
+  prepare:
+    cmd: python prepare.py
+    deps:
+      - raw_data.csv
+    outs:
+      - data/prepared.csv
+```
+
+### Creating a training stage with parameters and metrics
+
+```bash
+dvc stage add -n train \
+  -d data/prepared.csv \
+  -d src/train.py \
+  -p train.epochs,train.lr \
+  -o models/model.pkl \
+  -m metrics/train.json \
+  --desc "Train ML model with hyperparameters" \
+  python src/train.py
+```
+
+<Tip>
+  The `-p` flag tells DVC to track specific parameters from `params.yaml`. The stage will re-run if these parameter values change.
+</Tip>
+
+Resulting `dvc.yaml`:
+
+```yaml
+stages:
+  train:
+    cmd: python src/train.py
+    deps:
+      - data/prepared.csv
+      - src/train.py
+    params:
+      - train.epochs
+      - train.lr
+    outs:
+      - models/model.pkl
+    metrics:
+      - metrics/train.json:
+          cache: false
+    desc: Train ML model with hyperparameters
+```
+
+### Creating a stage with multiple outputs
+
+```bash
+dvc stage add -n evaluate \
+  -d models/model.pkl \
+  -d data/test.csv \
+  -m metrics/scores.json \
+  --plots plots/confusion_matrix.csv \
+  --plots plots/roc_curve.csv \
+  -O logs/eval.log \
+  python evaluate.py
+```
+
+<Info>
+  The `-O` flag (uppercase) creates outputs that aren't cached. This is useful for log files or intermediate results you don't need to version.
+</Info>
+
+### Listing all stages in current pipeline
+
+```bash
+dvc stage list
+```
+
+Output:
+```
+prepare    Outputs data/prepared.csv
+train      Outputs models/model.pkl; Reports metrics/train.json
+evaluate   Reports metrics/scores.json, plots/confusion_matrix.csv, plots/roc_curve.csv
+```
+
+### Listing stages with names only
+
+```bash
+dvc stage list --name-only
+```
+
+Output:
+```
+prepare
+train
+evaluate
+```
+
+### Listing all stages recursively
+
+```bash
+dvc stage list -R pipelines/
+```
+
+This lists all stages in all `dvc.yaml` files within the `pipelines/` directory.
+
+### Creating a stage with custom working directory
+
+```bash
+dvc stage add -n preprocess \
+  -d ../data/raw.csv \
+  -o processed.csv \
+  -w preprocessing \
+  python process.py
+```
+
+<Note>
+  The command `python process.py` will be executed from the `preprocessing/` directory. All paths in dependencies and outputs are relative to the repository root, not the working directory.
+</Note>
+
+### Overwriting an existing stage
+
+```bash
+dvc stage add -n train -f \
+  -d data/prepared.csv \
+  -p train.epochs \
+  -o models/model.pkl \
+  python train.py
+```
+
+The `-f` flag allows you to replace an existing stage without error.
+
+### Creating and running a stage immediately
+
+```bash
+dvc stage add -n transform \
+  -d input.csv \
+  -o output.csv \
+  --run \
+  python transform.py
+```
+
+<Warning>
+  Using `--run` will execute the stage command immediately. Make sure all dependencies are available and the command is correct.
+</Warning>
+
+## Notes
+
+<Note>
+  **Migration from `dvc run`**: The `dvc stage add` command replaces the deprecated `dvc run` command. All functionality from `dvc run` is available in `dvc stage add`.
+</Note>
+
+<Tip>
+  **Stage addressing**: Stages can be referenced by name (e.g., `train`) or by file path with colon syntax (e.g., `pipelines/ml.dvc.yaml:train`).
+</Tip>
+
+<Info>
+  **Pipeline files**: Stages are defined in `dvc.yaml` files. When you run stages, DVC generates `dvc.lock` files that capture the exact state of dependencies and outputs, ensuring reproducibility.
+</Info>
+
+## See Also
+
+- [dvc repro](/commands/repro) - Reproduce stages or pipelines
+- [dvc dag](/commands/dag) - Visualize pipeline structure
+- [dvc params](/commands/params) - Commands to display parameters

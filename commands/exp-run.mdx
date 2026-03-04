@@ -1,0 +1,304 @@
+---
+title: 'dvc exp run'
+description: 'Run experiments by executing pipeline stages with different parameters'
+---
+
+## Description
+
+Run a DVC experiment to test different hyperparameters, code changes, or data versions. This command executes your pipeline stages and tracks the results as experiments. It inherits functionality from `dvc repro` but adds experiment-specific features like parameter overrides, queueing, and parallel execution.
+
+<Tip>
+Experiments are lightweight and don't clutter your Git history. Use `dvc exp show` to view results and `dvc exp apply` to promote successful experiments.
+</Tip>
+
+## Usage
+
+```bash
+dvc exp run [options] [targets...]
+```
+
+## Arguments
+
+<ParamField path="targets" type="string[]" optional>
+  Stages to reproduce. Defaults to `dvc.yaml` from the current directory. Can be:
+  - Path to a `dvc.yaml` or `.dvc` file
+  - Stage name from `dvc.yaml` in current directory  
+  - Path followed by colon and stage name (e.g., `path/to/dvc.yaml:stage_name`)
+</ParamField>
+
+## Options
+
+### Experiment Options
+
+<ParamField path="-n, --name" type="string">
+  Human-readable experiment name. If not specified, a name will be auto-generated.
+  
+  ```bash
+  dvc exp run -n "high-learning-rate"
+  ```
+</ParamField>
+
+<ParamField path="-S, --set-param" type="string">
+  Override parameter values for this experiment run. Can be used multiple times.
+  
+  Format: `[<filename>:]<param_name>=<param_value>`
+  
+  ```bash
+  dvc exp run -S train.learning_rate=0.001 -S train.epochs=100
+  dvc exp run -S params.yaml:model.layers=5
+  ```
+</ParamField>
+
+<ParamField path="--queue" type="boolean" default="false">
+  Stage this experiment in the run queue for future execution instead of running immediately.
+  
+  ```bash
+  dvc exp run --queue -S lr=0.01
+  dvc exp run --queue -S lr=0.001
+  dvc exp run --run-all  # Execute all queued experiments
+  ```
+</ParamField>
+
+<ParamField path="--run-all" type="boolean" default="false">
+  Execute all experiments in the run queue. Implies `--temp`.
+  
+  ```bash
+  dvc exp run --run-all -j 4  # Run all queued experiments, 4 in parallel
+  ```
+</ParamField>
+
+<ParamField path="-j, --jobs" type="integer" default="1">
+  Run the specified number of experiments in parallel. Useful with `--run-all`.
+  
+  ```bash
+  dvc exp run --run-all --jobs 4
+  ```
+</ParamField>
+
+<ParamField path="--temp" type="boolean" default="false">
+  Run experiment in a separate temporary directory instead of your workspace. Prevents workspace pollution during experiments.
+  
+  ```bash
+  dvc exp run --temp
+  ```
+</ParamField>
+
+<ParamField path="-C, --copy-paths" type="string[]">
+  List of ignored or untracked paths to copy into the temp directory. Only used with `--temp` or `--queue`.
+  
+  ```bash
+  dvc exp run --temp -C config.local -C .env
+  ```
+</ParamField>
+
+<ParamField path="-m, --message" type="string">
+  Custom commit message to use when committing the experiment.
+  
+  ```bash
+  dvc exp run -m "Testing improved data preprocessing"
+  ```
+</ParamField>
+
+<ParamField path="--no-hydra" type="boolean" default="false">
+  Disable automatic updating of `params.yaml` with Hydra configuration. You can still use `--set-param` to update individual params.
+</ParamField>
+
+### Pipeline Execution Options
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Reproduce even if dependencies were not changed.
+  
+  ```bash
+  dvc exp run --force
+  ```
+</ParamField>
+
+<ParamField path="-i, --interactive" type="boolean" default="false">
+  Ask for confirmation before reproducing each stage.
+</ParamField>
+
+<ParamField path="-s, --single-item" type="boolean" default="false">
+  Reproduce only single data item without recursive dependencies check.
+</ParamField>
+
+<ParamField path="-p, --pipeline" type="boolean" default="false">
+  Reproduce the whole pipeline that the specified targets belong to.
+  
+  ```bash
+  dvc exp run -p train.dvc
+  ```
+</ParamField>
+
+<ParamField path="-P, --all-pipelines" type="boolean" default="false">
+  Reproduce all pipelines in the repository.
+  
+  ```bash
+  dvc exp run -P
+  ```
+</ParamField>
+
+<ParamField path="-R, --recursive" type="boolean" default="false">
+  Reproduce all stages in the specified directory.
+</ParamField>
+
+<ParamField path="--downstream" type="boolean" default="false">
+  Start from the specified stages when reproducing pipelines.
+</ParamField>
+
+<ParamField path="--force-downstream" type="boolean" default="false">
+  Reproduce all descendants of a changed stage even if their direct dependencies didn't change.
+</ParamField>
+
+<ParamField path="--pull" type="boolean" default="false">
+  Try automatically pulling missing data before running.
+  
+  ```bash
+  dvc exp run --pull
+  ```
+</ParamField>
+
+<ParamField path="--allow-missing" type="boolean" default="false">
+  Skip stages with missing data but no other changes.
+</ParamField>
+
+<ParamField path="--dry" type="boolean" default="false">
+  Only print the commands that would be executed without actually executing them.
+  
+  ```bash
+  dvc exp run --dry -S lr=0.01
+  ```
+</ParamField>
+
+<ParamField path="-k, --keep-going" type="boolean" default="false">
+  Continue executing, skipping stages having dependencies on failed stages.
+</ParamField>
+
+<ParamField path="--ignore-errors" type="boolean" default="false">
+  Ignore errors from stages and continue execution.
+</ParamField>
+
+## Examples
+
+### Run a basic experiment
+
+```bash
+dvc exp run
+```
+
+<Info>This runs your pipeline and creates an experiment with an auto-generated name.</Info>
+
+### Run with custom parameters
+
+```bash
+dvc exp run -n "lr-experiment" -S train.lr=0.001 -S train.epochs=50
+```
+
+Output:
+```bash
+Running experiment 'lr-experiment'...
+Reproducing 'prepare'
+Reproducing 'train'
+Reproducing 'evaluate'
+Experiment 'lr-experiment' has been created.
+```
+
+### Queue multiple experiments
+
+```bash
+# Queue experiments with different learning rates
+dvc exp run --queue -S train.lr=0.1 -n "lr-0.1"
+dvc exp run --queue -S train.lr=0.01 -n "lr-0.01" 
+dvc exp run --queue -S train.lr=0.001 -n "lr-0.001"
+
+# Run all queued experiments in parallel
+dvc exp run --run-all --jobs 3
+```
+
+Output:
+```bash
+Queued experiment 'lr-0.1' for future execution.
+Queued experiment 'lr-0.01' for future execution.
+Queued experiment 'lr-0.001' for future execution.
+
+Running 3 experiments in parallel...
+Experiment 'lr-0.1' completed successfully.
+Experiment 'lr-0.01' completed successfully.
+Experiment 'lr-0.001' completed successfully.
+```
+
+<Tip>
+Queueing experiments is useful for hyperparameter sweeps. Queue all variations, then run them in parallel with `--run-all --jobs N`.
+</Tip>
+
+### Run in temporary directory
+
+```bash
+dvc exp run --temp -S model.type=cnn
+```
+
+<Note>
+Using `--temp` keeps your workspace clean. The experiment runs in an isolated temporary directory.
+</Note>
+
+### Test parameters without execution
+
+```bash
+dvc exp run --dry -S train.lr=0.01 -S train.batch_size=64
+```
+
+Output:
+```bash
+Stage 'prepare' would run: python prepare.py
+Stage 'train' would run: python train.py --lr 0.01 --batch-size 64
+Stage 'evaluate' would run: python evaluate.py
+```
+
+### Run specific pipeline stage
+
+```bash
+dvc exp run train -f
+```
+
+<Warning>
+The `-f` flag forces re-execution even if dependencies haven't changed. Use carefully as it can be time-consuming.
+</Warning>
+
+## Common Workflows
+
+### Hyperparameter tuning
+
+```bash
+# Queue experiments with different hyperparameters
+for lr in 0.1 0.01 0.001; do
+  for bs in 32 64 128; do
+    dvc exp run --queue -n "lr${lr}-bs${bs}" \
+      -S train.lr=$lr -S train.batch_size=$bs
+  done
+done
+
+# Execute all experiments in parallel
+dvc exp run --run-all --jobs 4
+
+# View results
+dvc exp show --only-changed
+```
+
+### Testing code changes
+
+```bash
+# Make code changes to your training script
+vim train.py
+
+# Run experiment to test changes
+dvc exp run -n "new-architecture" -m "Testing ResNet architecture"
+
+# Compare with baseline
+dvc exp diff
+```
+
+## Related Commands
+
+- `dvc exp show` - View experiment results
+- `dvc exp diff` - Compare experiments  
+- `dvc exp apply` - Apply experiment changes to workspace
+- `dvc repro` - Reproduce pipelines without experiment tracking

@@ -1,0 +1,327 @@
+---
+title: 'Python API Overview'
+description: 'Complete Python API reference for programmatic access to DVC tracked data, parameters, metrics, and experiments'
+icon: 'python'
+---
+
+The DVC Python API allows you to access and interact with DVC-tracked data, parameters, metrics, and experiments programmatically from your Python code.
+
+## Installation
+
+The DVC Python API is included with the main DVC package:
+
+```bash
+pip install dvc
+```
+
+## Core Concepts
+
+The DVC API provides several categories of functions:
+
+### Data Access
+
+Access DVC-tracked files and their contents from any repository:
+
+- **`dvc.api.open()`** - Stream file contents with context manager
+- **`dvc.api.read()`** - Read complete file contents
+- **`dvc.api.get_url()`** - Get remote storage URL for a file
+
+### Parameters & Metrics
+
+Retrieve parameters and metrics from your experiments:
+
+- **`dvc.api.params_show()`** - Get parameters from tracking files
+- **`dvc.api.metrics_show()`** - Get metrics from tracking files
+
+### Experiments
+
+Access and manage DVC experiments:
+
+- **`dvc.api.exp_show()`** - List and compare experiments
+- **`dvc.api.exp_save()`** - Create new experiments
+
+### Artifacts
+
+Work with model registry artifacts:
+
+- **`dvc.api.artifacts_show()`** - Get artifact path and revision
+
+### File System
+
+Direct file system access to DVC and Git repositories:
+
+- **`dvc.api.DVCFileSystem`** - Unified file system interface
+
+## Quick Start
+
+<CodeGroup>
+
+```python Read a DVC-tracked file
+import dvc.api
+
+# Read the entire file
+data = dvc.api.read(
+    'data/train.csv',
+    repo='https://github.com/iterative/example-get-started'
+)
+```
+
+```python Stream large files
+import dvc.api
+import pandas as pd
+
+# Stream file for memory efficiency
+with dvc.api.open(
+    'data/large_dataset.csv',
+    repo='https://github.com/user/repo'
+) as f:
+    df = pd.read_csv(f)
+```
+
+```python Get parameters
+import dvc.api
+
+params = dvc.api.params_show()
+print(params['train']['lr'])  # Access learning rate
+```
+
+```python Compare experiments
+import dvc.api
+
+experiments = dvc.api.exp_show()
+for exp in experiments:
+    print(f"{exp['Experiment']}: {exp.get('metrics.accuracy')}")
+```
+
+</CodeGroup>
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Load Training Data" icon="database" href="/api/open">
+  Stream or read DVC-tracked datasets in your training scripts
+</Card>
+
+<Card title="Access Parameters" icon="sliders" href="/api/params_show">
+  Retrieve hyperparameters from any experiment or branch
+</Card>
+
+<Card title="Fetch Metrics" icon="chart-line" href="/api/metrics_show">
+  Get model performance metrics programmatically
+</Card>
+
+<Card title="Compare Experiments" icon="flask" href="/api/exp_show">
+  Analyze and compare experiment results
+</Card>
+
+</CardGroup>
+
+## Working with Repositories
+
+All API functions support accessing both local and remote repositories:
+
+<Tabs>
+  <Tab title="Current Repository">
+    ```python
+    import dvc.api
+    
+    # Automatically uses the current DVC project
+    data = dvc.api.read('data/model.pkl')
+    ```
+  </Tab>
+  
+  <Tab title="Remote Repository">
+    ```python
+    import dvc.api
+    
+    # Access remote GitHub repository
+    data = dvc.api.read(
+        'data/model.pkl',
+        repo='https://github.com/user/repo'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Local Path">
+    ```python
+    import dvc.api
+    
+    # Access local repository by path
+    data = dvc.api.read(
+        'data/model.pkl',
+        repo='/path/to/local/repo'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="SSH Repository">
+    ```python
+    import dvc.api
+    
+    # Access private repository via SSH
+    data = dvc.api.read(
+        'data/model.pkl',
+        repo='git@github.com:user/private-repo.git'
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Version Control
+
+Access any Git revision (branch, tag, commit) using the `rev` parameter:
+
+```python
+import dvc.api
+
+# Get data from a specific branch
+data_main = dvc.api.read('data.csv', rev='main')
+
+# Get data from a tagged release
+data_v1 = dvc.api.read('data.csv', rev='v1.0.0')
+
+# Get data from a specific commit
+data_commit = dvc.api.read('data.csv', rev='abc123def')
+
+# Get data from an experiment
+data_exp = dvc.api.read('data.csv', rev='exp-random-forest')
+```
+
+<Note>
+For local repositories, omitting `rev` will read from the working directory. For remote repositories, it defaults to the default branch.
+</Note>
+
+## API Reference
+
+Explore the detailed API documentation:
+
+<CardGroup cols={3}>
+
+<Card title="open()" icon="folder-open" href="/api/open">
+  Stream file contents
+</Card>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Read complete file
+</Card>
+
+<Card title="get_url()" icon="link" href="/api/get_url">
+  Get storage URL
+</Card>
+
+<Card title="params_show()" icon="sliders" href="/api/params_show">
+  Show parameters
+</Card>
+
+<Card title="metrics_show()" icon="chart-line" href="/api/metrics_show">
+  Show metrics
+</Card>
+
+<Card title="exp_show()" icon="flask" href="/api/exp_show">
+  Show experiments
+</Card>
+
+<Card title="artifacts_show()" icon="cube" href="/api/artifacts_show">
+  Show artifacts
+</Card>
+
+<Card title="DVCFileSystem" icon="folder-tree" href="/api/dvcfilesystem">
+  File system API
+</Card>
+
+</CardGroup>
+
+## Error Handling
+
+The API raises specific exceptions that you should handle:
+
+```python
+import dvc.api
+from dvc.exceptions import (
+    OutputNotFoundError,
+    FileMissingError,
+    PathMissingError
+)
+
+try:
+    data = dvc.api.read('data/file.csv', repo='https://github.com/user/repo')
+except OutputNotFoundError:
+    print("File is not tracked by DVC")
+except FileMissingError:
+    print("File not found in repository")
+except PathMissingError as e:
+    print(f"Path missing: {e}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Use context managers for large files">
+  When working with large files, use `dvc.api.open()` instead of `dvc.api.read()` to stream data and optimize memory usage:
+  
+  ```python
+  with dvc.api.open('large_file.bin') as f:
+      for chunk in f:
+          process(chunk)
+  ```
+</Accordion>
+
+<Accordion title="Specify remote for faster access">
+  If you know which remote contains your data, specify it to avoid trying the default remote:
+  
+  ```python
+  data = dvc.api.read('data.csv', remote='myremote')
+  ```
+</Accordion>
+
+<Accordion title="Cache repository instances">
+  When making multiple API calls to the same repository, consider using `DVCFileSystem` for better performance:
+  
+  ```python
+  from dvc.api import DVCFileSystem
+  
+  fs = DVCFileSystem(repo='https://github.com/user/repo', rev='main')
+  with fs.open('file1.csv') as f1:
+      data1 = f1.read()
+  with fs.open('file2.csv') as f2:
+      data2 = f2.read()
+  ```
+</Accordion>
+
+<Accordion title="Handle authentication for private repos">
+  For private repositories, ensure your Git credentials are configured:
+  
+  ```bash
+  # SSH key setup
+  ssh-add ~/.ssh/id_rsa
+  
+  # Or use credentials helper for HTTPS
+  git config --global credential.helper store
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Data Access Guide" icon="book" href="/api/open">
+  Learn about streaming and reading files
+</Card>
+
+<Card title="Experiments Guide" icon="flask" href="/api/exp_show">
+  Work with experiments programmatically
+</Card>
+
+<Card title="CLI Reference" icon="terminal" href="/commands/overview">
+  Explore the command-line interface
+</Card>
+
+<Card title="Examples" icon="code" href="https://github.com/iterative/example-get-started">
+  See real-world examples
+</Card>
+
+</CardGroup>

@@ -1,0 +1,266 @@
+---
+title: Data Versioning
+description: Learn how DVC versions data files and directories using content-addressable storage
+---
+
+## What is Data Versioning?
+
+Data versioning in DVC is a lightweight mechanism to track large files and directories without storing them in Git. Instead of bloating your Git repository with massive datasets or model files, DVC stores metadata pointers (`.dvc` files) in Git while the actual data lives in a cache.
+
+<Info>
+**Key Concept**: DVC uses content-addressable storage, meaning files are identified by their hash (checksum), not their name. If the content changes, the hash changes, creating a new version.
+</Info>
+
+## Why Data Versioning Matters
+
+Traditional version control systems like Git aren't designed for large binary files. DVC solves this by:
+
+- **Keeping Git lightweight**: Only small metadata files are tracked in Git
+- **Enabling true reproducibility**: Every code version links to specific data versions
+- **Supporting massive datasets**: Handle gigabytes or terabytes of data efficiently
+- **Providing data lineage**: Track how data evolves over time
+
+## How Data Versioning Works
+
+When you add a file to DVC using `dvc add`, several things happen under the hood:
+
+### 1. Content Hashing
+
+DVC computes a hash (checksum) of your file or directory. The implementation can be found in `dvc/output.py`:
+
+```python
+# From dvc/output.py:534-565
+def _get_hash_meta(self):
+    if self.use_cache:
+        odb = self.cache
+    else:
+        odb = self.local_cache
+    _, meta, obj = self._build(
+        odb,
+        self.fs_path,
+        self.fs,
+        self.hash_name,
+        ignore=self.dvcignore,
+        dry_run=not self.use_cache,
+    )
+    return meta, obj.hash_info
+```
+
+By default, DVC uses **md5** hashing for local files and adapts to cloud-specific checksums (etag for S3, checksum for HDFS) for remote storage.
+
+<Note>
+DVC 3.x uses `md5` as the default hash algorithm. For directories, DVC creates a `.dir` file containing hashes of all files inside.
+</Note>
+
+### 2. Cache Storage
+
+The actual file content is moved (or linked) to the DVC cache directory at `.dvc/cache/files/md5/`. The cache uses a content-addressable structure:
+
+```
+.dvc/cache/files/md5/
+  ab/
+    cd1234567890abcdef1234567890abcd  # Your actual file
+```
+
+The first two characters of the hash become a subdirectory for efficient file system performance.
+
+### 3. DVC File Creation
+
+A `.dvc` file is created with metadata about your tracked file:
+
+```yaml
+outs:
+- md5: abcd1234567890abcdef1234567890ab
+  size: 1048576
+  path: data/train.csv
+  cache: true
+```
+
+This `.dvc` file goes into Git, serving as a pointer to the actual data in the cache.
+
+### 4. Workspace Linking
+
+DVC creates a link (reflink, hardlink, symlink, or copy) from your workspace to the cached file. The implementation in `dvc/output.py:752-800` handles this:
+
+```python
+def commit(self, filter_info=None, relink=True) -> None:
+    if not self.exists:
+        raise self.DoesNotExistError(self)
+    
+    if self.use_cache:
+        # Transfer to cache
+        otransfer(
+            staging,
+            self.cache,
+            {obj.hash_info},
+            shallow=False,
+            hardlink=hardlink,
+            callback=cb,
+        )
+        if relink:
+            # Link from cache back to workspace
+            self._checkout(
+                filter_info or self.fs_path,
+                self.fs,
+                obj,
+                self.cache,
+                relink=True,
+                state=self.repo.state,
+                prompt=prompt.confirm,
+                progress_callback=cb,
+                old=obj,
+            )
+```
+
+## Directory Versioning
+
+Directories are handled specially in DVC. From `dvc/output.py:220-232`:
+
+```python
+def _serialize_tree_obj_to_files(obj: Tree) -> list[dict[str, Any]]:
+    key = obj.PARAM_RELPATH
+    return sorted(
+        (
+            {
+                key: posixpath.sep.join(parts),
+                **_serialize_hi_to_dict(hi),
+                **meta.to_dict(),
+            }
+            for parts, meta, hi in obj
+        ),
+        key=itemgetter(key),
+    )
+```
+
+For directories:
+1. Each file inside is hashed individually
+2. A `.dir` file is created in cache containing JSON with all file hashes
+3. The directory hash is the hash of this `.dir` file
+4. The `.dvc` file stores just the directory hash and metadata
+
+<Accordion title="Example: Directory .dvc File">
+```yaml
+outs:
+- md5: a1b2c3d4e5f6.dir
+  size: 5242880
+  nfiles: 42
+  path: data/images/
+```
+
+The `.dir` file in cache contains:
+```json
+[
+  {"relpath": "cat.jpg", "md5": "abc123...", "size": 12345},
+  {"relpath": "dog.jpg", "md5": "def456...", "size": 23456}
+]
+```
+</Accordion>
+
+## Version Switching
+
+To switch between data versions:
+
+```bash
+# Switch to a different Git branch/commit
+git checkout experiment-branch
+
+# Update workspace to match DVC files in that version
+dvc checkout
+```
+
+The `dvc checkout` command reads the `.dvc` files in your workspace and restores files from cache.
+
+## Data Lineage
+
+<CardGroup cols={2}>
+  <Card title="Track Changes" icon="clock-rotate-left">
+    Use Git history to see how `.dvc` files changed
+    ```bash
+    git log data/train.csv.dvc
+    ```
+  </Card>
+  
+  <Card title="Compare Versions" icon="code-compare">
+    View differences between data versions
+    ```bash
+    git diff HEAD~1 data/train.csv.dvc
+    ```
+  </Card>
+</CardGroup>
+
+## File Status and Changes
+
+DVC tracks whether files have changed from what's recorded in `.dvc` files. The implementation in `dvc/output.py:599-642`:
+
+```python
+def changed_checksum(self):
+    return self.hash_info != self.get_hash()
+
+def changed_cache(self, filter_info=None):
+    if not self.use_cache or not self.hash_info:
+        return True
+    obj = self.get_obj(filter_info=filter_info)
+    if not obj:
+        return True
+    try:
+        ocheck(self.cache, obj)
+        return False
+    except (FileNotFoundError, ObjectFormatError):
+        return True
+
+def status(self) -> dict[str, str]:
+    if self.hash_info and self.use_cache and self.changed_cache():
+        return {str(self): "not in cache"}
+    return self.workspace_status()
+```
+
+This enables commands like:
+- `dvc status` - Shows which tracked files have changed
+- `dvc diff` - Shows differences between versions
+
+<Warning>
+**Important**: If you modify a DVC-tracked file directly, you must run `dvc add` again to update its version. DVC doesn't automatically detect changes.
+</Warning>
+
+## Output Types
+
+DVC supports different output types with special handling:
+
+| Type | Purpose | Schema Field |
+|------|---------|-------------|
+| **Regular Output** | Standard tracked files | `cache: true` |
+| **Metric** | Numerical results for comparison | `metric: true` |
+| **Plot** | Data for visualization | `plot: true` |
+| **No-cache** | Tracked but not cached | `cache: false` |
+| **Persist** | Not removed on `dvc repro` | `persist: true` |
+
+From `dvc/output.py:281-303`:
+```python
+PARAM_PATH = "path"
+PARAM_CACHE = "cache"
+PARAM_METRIC = "metric"
+PARAM_PLOT = "plot"
+PARAM_PERSIST = "persist"
+PARAM_REMOTE = "remote"
+PARAM_PUSH = "push"
+```
+
+## Related Commands
+
+- [`dvc add`](/commands/add) - Start tracking a file or directory
+- [`dvc checkout`](/commands/checkout) - Restore tracked files from cache
+- [`dvc status`](/commands/status) - Check for changes in tracked files
+- [`dvc push`](/commands/push) - Upload tracked data to remote storage
+- [`dvc pull`](/commands/pull) - Download tracked data from remote storage
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Remote Storage" href="/concepts/remote-storage" icon="cloud">
+    Learn how to share versioned data with your team
+  </Card>
+  
+  <Card title="Pipelines" href="/concepts/pipelines" icon="diagram-project">
+    Connect versioned data with processing steps
+  </Card>
+</CardGroup>

@@ -1,0 +1,570 @@
+---
+title: "Remote Storage"
+description: "Configure and use remote storage for data and model versioning"
+---
+
+## Overview
+
+Remote storage allows you to store your data, models, and pipeline outputs outside your Git repository. This enables team collaboration, backup, and access from different machines or environments.
+
+<Info>
+  DVC supports many storage types: Amazon S3, Google Cloud Storage, Azure Blob Storage, SSH, HTTP, and more.
+</Info>
+
+## Setting Up Remote Storage
+
+<Steps>
+  <Step title="Add a remote">
+    Configure a remote storage location:
+
+    ```bash
+    dvc remote add -d myremote s3://my-bucket/dvc-storage
+    ```
+
+    The `-d` flag sets this as the default remote.
+
+    <Tip>
+      You can add multiple remotes and switch between them as needed.
+    </Tip>
+  </Step>
+
+  <Step title="Configure credentials">
+    Set up authentication for your storage:
+
+    <Tabs>
+      <Tab title="AWS S3">
+        ```bash
+        # Using AWS CLI profiles
+        dvc remote modify myremote profile myprofile
+        
+        # Or set credentials directly (not recommended)
+        dvc remote modify myremote access_key_id YOUR_KEY
+        dvc remote modify myremote secret_access_key YOUR_SECRET
+        ```
+      </Tab>
+
+      <Tab title="Google Cloud Storage">
+        ```bash
+        # Using service account
+        dvc remote modify myremote credentialpath ~/.config/gcloud/credentials.json
+        
+        # Or using project ID
+        dvc remote modify myremote projectname my-project
+        ```
+      </Tab>
+
+      <Tab title="Azure Blob Storage">
+        ```bash
+        dvc remote modify myremote account_name myaccount
+        dvc remote modify myremote account_key YOUR_KEY
+        ```
+      </Tab>
+
+      <Tab title="SSH">
+        ```bash
+        # Using SSH key
+        dvc remote modify myremote keyfile ~/.ssh/id_rsa
+        
+        # Or password (less secure)
+        dvc remote modify myremote password YOUR_PASSWORD
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Commit configuration">
+    Save remote configuration to Git:
+
+    ```bash
+    git add .dvc/config
+    git commit -m "Configure DVC remote storage"
+    ```
+
+    <Warning>
+      Never commit credentials to Git. Use environment variables or separate credential files.
+    </Warning>
+  </Step>
+</Steps>
+
+## Supported Storage Types
+
+<Tabs>
+  <Tab title="Amazon S3">
+    ```bash
+    dvc remote add -d myremote s3://bucket/path
+    ```
+
+    Configuration options:
+    ```bash
+    dvc remote modify myremote region us-west-2
+    dvc remote modify myremote profile myprofile
+    dvc remote modify myremote endpoint_url https://s3.custom-endpoint.com
+    ```
+  </Tab>
+
+  <Tab title="Google Cloud Storage">
+    ```bash
+    dvc remote add -d myremote gs://bucket/path
+    ```
+
+    Configuration options:
+    ```bash
+    dvc remote modify myremote projectname my-project
+    dvc remote modify myremote credentialpath /path/to/credentials.json
+    ```
+  </Tab>
+
+  <Tab title="Azure Blob Storage">
+    ```bash
+    dvc remote add -d myremote azure://container/path
+    ```
+
+    Configuration options:
+    ```bash
+    dvc remote modify myremote account_name myaccount
+    dvc remote modify myremote account_key mykey
+    dvc remote modify myremote sas_token mytoken
+    ```
+  </Tab>
+
+  <Tab title="SSH/SFTP">
+    ```bash
+    dvc remote add -d myremote ssh://user@example.com/path/to/storage
+    ```
+
+    Configuration options:
+    ```bash
+    dvc remote modify myremote port 2222
+    dvc remote modify myremote keyfile ~/.ssh/id_rsa
+    dvc remote modify myremote ask_password true
+    ```
+  </Tab>
+
+  <Tab title="Local/Network">
+    ```bash
+    # Local directory
+    dvc remote add -d myremote /mnt/shared/dvc-storage
+    
+    # Network share
+    dvc remote add -d myremote smb://server/share/path
+    ```
+  </Tab>
+
+  <Tab title="HTTP/HTTPS">
+    ```bash
+    dvc remote add -d myremote https://example.com/dvc-storage
+    ```
+
+    Configuration options:
+    ```bash
+    dvc remote modify myremote auth basic
+    dvc remote modify myremote user myusername
+    dvc remote modify myremote password mypassword
+    ```
+  </Tab>
+</Tabs>
+
+## Pushing and Pulling Data
+
+### Push to Remote
+
+Upload tracked data to remote storage:
+
+<CodeGroup>
+
+```bash Push all data
+dvc push
+```
+
+```bash Push specific file
+dvc push data/dataset.csv.dvc
+```
+
+```bash Push to specific remote
+dvc push -r myremote
+```
+
+```bash Push with multiple jobs
+dvc push -j 8
+```
+
+```bash Push all branches
+dvc push --all-branches
+```
+
+</CodeGroup>
+
+### Pull from Remote
+
+Download tracked data from remote storage:
+
+<CodeGroup>
+
+```bash Pull all data
+dvc pull
+```
+
+```bash Pull specific file
+dvc pull data/dataset.csv.dvc
+```
+
+```bash Pull from specific remote
+dvc pull -r myremote
+```
+
+```bash Pull with dependencies
+dvc pull --with-deps train.dvc
+```
+
+```bash Pull recursively
+dvc pull -R data/
+```
+
+</CodeGroup>
+
+### Fetch (Download to Cache Only)
+
+Download data to cache without checking out to workspace:
+
+```bash
+dvc fetch
+```
+
+Then checkout when needed:
+
+```bash
+dvc checkout
+```
+
+<Info>
+  Use `fetch` + `checkout` when you want to download data but not immediately use it in your workspace.
+</Info>
+
+## Managing Remotes
+
+### List Remotes
+
+```bash
+dvc remote list
+```
+
+Example output:
+```bash
+myremote	s3://my-bucket/dvc-storage	(default)
+backup		/mnt/backup/dvc-storage
+```
+
+### Set Default Remote
+
+```bash
+dvc remote default myremote
+```
+
+### Modify Remote Settings
+
+```bash
+# Modify URL
+dvc remote modify myremote url s3://new-bucket/path
+
+# Modify options
+dvc remote modify myremote region us-east-1
+
+# Unset option
+dvc remote modify myremote --unset region
+```
+
+### Remove Remote
+
+```bash
+dvc remote remove myremote
+```
+
+### Rename Remote
+
+```bash
+dvc remote rename myremote production
+```
+
+## Remote Configuration Levels
+
+DVC supports three configuration levels:
+
+<Tabs>
+  <Tab title="Project (default)">
+    ```bash
+    dvc remote add myremote s3://bucket/path
+    ```
+    
+    Stored in `.dvc/config` (committed to Git, shared with team).
+  </Tab>
+
+  <Tab title="Local">
+    ```bash
+    dvc remote add --local myremote s3://bucket/path
+    ```
+    
+    Stored in `.dvc/config.local` (not committed, machine-specific).
+  </Tab>
+
+  <Tab title="Global">
+    ```bash
+    dvc remote add --global myremote s3://bucket/path
+    ```
+    
+    Stored in `~/.config/dvc/config` (applies to all projects).
+  </Tab>
+
+  <Tab title="System">
+    ```bash
+    dvc remote add --system myremote s3://bucket/path
+    ```
+    
+    Stored in `/etc/dvc/config` (system-wide configuration).
+  </Tab>
+</Tabs>
+
+<Warning>
+  Store credentials in `.dvc/config.local` (local level) to avoid committing them to Git.
+</Warning>
+
+## Advanced Remote Options
+
+### Parallel Jobs
+
+Control how many files are transferred simultaneously:
+
+```bash
+dvc remote modify myremote jobs 16
+```
+
+Or per-command:
+
+```bash
+dvc push -j 16
+```
+
+### Bandwidth Limit
+
+```bash
+# Limit to 10MB/s
+dvc remote modify myremote bandwidth_limit 10485760
+```
+
+### Connection Timeout
+
+```bash
+dvc remote modify myremote timeout 3600
+```
+
+### SSL Verification
+
+```bash
+# Disable SSL verification (not recommended for production)
+dvc remote modify myremote ssl_verify false
+```
+
+### Custom Endpoint
+
+```bash
+# For S3-compatible storage
+dvc remote modify myremote endpointurl https://minio.example.com
+```
+
+### Server-Side Encryption
+
+```bash
+# For S3
+dvc remote modify myremote sse AES256
+
+# For S3 with KMS
+dvc remote modify myremote sse aws:kms
+dvc remote modify myremote sse_kms_key_id your-kms-key-id
+```
+
+## Checking Storage Status
+
+Compare local cache with remote:
+
+```bash
+dvc status --cloud
+```
+
+Example output:
+```bash
+Data and pipelines are up to date.
+
+Remote storage status:
+    new:        data/train.csv
+    deleted:    models/old_model.pkl
+```
+
+<Info>
+  Use `dvc status -c` to see what needs to be pushed or pulled.
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Separate credentials" icon="key">
+  Store credentials in `.dvc/config.local` (not committed) or use environment variables
+</Card>
+
+<Card title="Use cloud IAM" icon="shield-halved">
+  Prefer IAM roles and instance profiles over access keys when possible
+</Card>
+
+<Card title="Enable versioning" icon="clock-rotate-left">
+  Turn on bucket versioning in S3/GCS to protect against accidental deletions
+</Card>
+
+<Card title="Set lifecycle policies" icon="recycle">
+  Configure cloud storage lifecycle rules to archive or delete old data
+</Card>
+
+<Card title="Use multiple remotes" icon="server">
+  Configure backup remotes for disaster recovery
+</Card>
+
+<Card title="Optimize transfers" icon="gauge-high">
+  Adjust `-j` (jobs) based on network bandwidth and file count
+</Card>
+
+</CardGroup>
+
+## Complete Examples
+
+### AWS S3 Setup
+
+<Steps>
+  <Step title="Create S3 bucket">
+    ```bash
+    aws s3 mb s3://my-dvc-storage
+    ```
+  </Step>
+
+  <Step title="Configure DVC remote">
+    ```bash
+    dvc remote add -d storage s3://my-dvc-storage/project-data
+    dvc remote modify storage region us-west-2
+    ```
+  </Step>
+
+  <Step title="Set credentials (local)">
+    ```bash
+    dvc remote modify --local storage profile myawsprofile
+    ```
+  </Step>
+
+  <Step title="Push data">
+    ```bash
+    dvc push
+    ```
+  </Step>
+</Steps>
+
+### Google Cloud Storage Setup
+
+<Steps>
+  <Step title="Create GCS bucket">
+    ```bash
+    gsutil mb gs://my-dvc-storage
+    ```
+  </Step>
+
+  <Step title="Configure DVC remote">
+    ```bash
+    dvc remote add -d storage gs://my-dvc-storage/project-data
+    dvc remote modify storage projectname my-gcp-project
+    ```
+  </Step>
+
+  <Step title="Set credentials (local)">
+    ```bash
+    dvc remote modify --local storage credentialpath ~/.config/gcloud/credentials.json
+    ```
+  </Step>
+
+  <Step title="Push data">
+    ```bash
+    dvc push
+    ```
+  </Step>
+</Steps>
+
+### Multi-Remote Setup
+
+Configure primary and backup remotes:
+
+```bash
+# Primary remote (cloud)
+dvc remote add -d primary s3://production-bucket/dvc
+dvc remote modify primary region us-east-1
+
+# Backup remote (local NAS)
+dvc remote add backup /mnt/nas/dvc-backup
+
+# Push to both
+dvc push -r primary
+dvc push -r backup
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication errors">
+    Check credentials configuration:
+    ```bash
+    dvc remote list
+    dvc config -l
+    ```
+    
+    Verify cloud provider credentials:
+    ```bash
+    # AWS
+    aws s3 ls s3://your-bucket/
+    
+    # GCP
+    gsutil ls gs://your-bucket/
+    ```
+  </Accordion>
+
+  <Accordion title="Slow transfers">
+    Increase parallel jobs:
+    ```bash
+    dvc push -j 16
+    ```
+    
+    Or configure permanently:
+    ```bash
+    dvc remote modify myremote jobs 16
+    ```
+  </Accordion>
+
+  <Accordion title="Network timeouts">
+    Increase timeout:
+    ```bash
+    dvc remote modify myremote timeout 7200
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied">
+    Check bucket permissions and IAM policies. Ensure your credentials have:
+    - S3: `s3:GetObject`, `s3:PutObject`, `s3:ListBucket`
+    - GCS: `storage.objects.get`, `storage.objects.create`, `storage.buckets.list`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Collaboration" icon="users" href="/guide/collaboration">
+  Share data and pipelines with your team using remote storage
+</Card>
+
+<Card title="Remote Config" icon="gear" href="/config/remote-config">
+  Explore advanced remote configuration options
+</Card>
+
+</CardGroup>

@@ -1,0 +1,636 @@
+---
+title: 'dvc.api.DVCFileSystem'
+description: 'Unified file system interface for DVC and Git repositories'
+icon: 'folder-tree'
+---
+
+<Note>
+Source: [dvc/fs/dvc.py:82-754](~/workspace/source/dvc/fs/dvc.py)
+</Note>
+
+## Description
+
+`DVCFileSystem` provides a unified file system interface to access both DVC-tracked and Git-tracked files in a repository. It implements the `fsspec` protocol, making it compatible with many data science libraries like pandas, PyTorch, and TensorFlow.
+
+This is a lower-level API compared to `dvc.api.open()` and `dvc.api.read()`, offering more control and better performance when working with multiple files from the same repository.
+
+<Info>
+`DVCFileSystem` is also available as `dvc.api.DVCFileSystem` for convenience.
+</Info>
+
+## Signature
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem(
+    repo: Union[Repo, os.PathLike[str], str, None] = None,
+    rev: Optional[str] = None,
+    subrepos: bool = False,
+    config: Optional[dict[str, Any]] = None,
+    remote: Optional[str] = None,
+    remote_config: Optional[dict[str, Any]] = None,
+)
+```
+
+## Parameters
+
+<ParamField path="repo" type="Union[Repo, os.PathLike, str, None]" default="None">
+  A URL, path to a DVC/Git repository, or a `Repo` instance.
+  
+  - Defaults to the current working directory DVC project
+  - Can be a local path or remote URL
+  - Both HTTP and SSH protocols are supported
+  
+  ```python
+  repo=None  # Current directory
+  repo="/path/to/local/repo"
+  repo="https://github.com/user/repo"
+  repo="git@github.com:user/repo.git"
+  ```
+</ParamField>
+
+<ParamField path="rev" type="str" default="None">
+  Any Git revision such as a branch name, tag name, commit hash, or DVC experiment name.
+  
+  - Defaults to the default branch for remote repos
+  - For local repos without `rev`, uses the working directory
+  - Ignored if `repo` is not a Git repository
+  
+  ```python
+  rev="main"
+  rev="v1.0.0"
+  rev="abc123"
+  rev="exp-random-forest"
+  ```
+</ParamField>
+
+<ParamField path="subrepos" type="bool" default="False">
+  Whether to traverse into subrepos (nested DVC repositories).
+  
+  ```python
+  subrepos=True   # Include subrepos
+  subrepos=False  # Ignore subrepos (default)
+  ```
+</ParamField>
+
+<ParamField path="config" type="dict" default="None">
+  DVC config dictionary to be passed to the repository.
+  
+  ```python
+  config={"cache": {"type": "symlink"}}
+  ```
+</ParamField>
+
+<ParamField path="remote" type="str" default="None">
+  Name of the DVC remote to use.
+  
+  ```python
+  remote="myremote"
+  remote="s3-storage"
+  ```
+</ParamField>
+
+<ParamField path="remote_config" type="dict" default="None">
+  Remote configuration dictionary.
+  
+  ```python
+  remote_config={"url": "s3://bucket/path"}
+  ```
+</ParamField>
+
+## Methods
+
+### File Operations
+
+<ParamField path="open(path, mode='rb', **kwargs)">
+  Open a file for reading.
+  
+  ```python
+  with fs.open('data/file.csv', mode='r') as f:
+      data = f.read()
+  ```
+</ParamField>
+
+<ParamField path="get(rpath, lpath, recursive=False, **kwargs)">
+  Download file(s) from the repository to local path.
+  
+  ```python
+  fs.get('data/dataset.csv', 'local_dataset.csv')
+  fs.get('data/', 'local_data/', recursive=True)
+  ```
+</ParamField>
+
+<ParamField path="get_file(rpath, lpath, **kwargs)">
+  Download a single file.
+  
+  ```python
+  fs.get_file('model.pkl', 'local_model.pkl')
+  ```
+</ParamField>
+
+### Directory Operations
+
+<ParamField path="ls(path, detail=True, **kwargs)">
+  List directory contents.
+  
+  ```python
+  # Get detailed info
+  files = fs.ls('data/', detail=True)
+  
+  # Get just paths
+  paths = fs.ls('data/', detail=False)
+  ```
+</ParamField>
+
+<ParamField path="walk(path, maxdepth=None, **kwargs)">
+  Walk through directory tree.
+  
+  ```python
+  for root, dirs, files in fs.walk('data/'):
+      for file in files:
+          print(fs.join(root, file))
+  ```
+</ParamField>
+
+### File Info
+
+<ParamField path="info(path, **kwargs)">
+  Get file or directory information.
+  
+  ```python
+  info = fs.info('data/file.csv')
+  print(info['size'])
+  print(info['type'])  # 'file' or 'directory'
+  ```
+</ParamField>
+
+<ParamField path="exists(path, **kwargs)">
+  Check if a path exists.
+  
+  ```python
+  if fs.exists('data/file.csv'):
+      print("File exists")
+  ```
+</ParamField>
+
+<ParamField path="isfile(path)">
+  Check if path is a file.
+  
+  ```python
+  if fs.isfile('data/file.csv'):
+      print("Is a file")
+  ```
+</ParamField>
+
+<ParamField path="isdir(path)">
+  Check if path is a directory.
+  
+  ```python
+  if fs.isdir('data/'):
+      print("Is a directory")
+  ```
+</ParamField>
+
+<ParamField path="isdvc(path, **kwargs)">
+  Check if path is DVC-tracked.
+  
+  ```python
+  if fs.isdvc('data/large_file.bin'):
+      print("Tracked by DVC")
+  ```
+</ParamField>
+
+### Utilities
+
+<ParamField path="du(path, total=True, maxdepth=None, **kwargs)">
+  Get disk usage for a path.
+  
+  ```python
+  size = fs.du('data/', total=True)
+  print(f"Total size: {size} bytes")
+  ```
+</ParamField>
+
+<ParamField path="getcwd()">
+  Get current working directory.
+  
+  ```python
+  cwd = fs.getcwd()
+  ```
+</ParamField>
+
+<ParamField path="join(*parts)">
+  Join path components.
+  
+  ```python
+  path = fs.join('data', 'subfolder', 'file.csv')
+  ```
+</ParamField>
+
+## Examples
+
+### Basic File Reading
+
+```python
+from dvc.api import DVCFileSystem
+
+# Create filesystem instance
+fs = DVCFileSystem(
+    repo='https://github.com/iterative/example-get-started',
+    rev='main'
+)
+
+# Read a file
+with fs.open('data/data.xml', mode='r') as f:
+    content = f.read()
+    print(content)
+```
+
+### List Directory Contents
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+# List files with details
+files = fs.ls('data/', detail=True)
+
+for file_info in files:
+    print(f"Name: {file_info['name']}")
+    print(f"Size: {file_info['size']} bytes")
+    print(f"Type: {file_info['type']}")
+    print()
+```
+
+### Download Files
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem(
+    repo='https://github.com/user/ml-project',
+    rev='production'
+)
+
+# Download single file
+fs.get_file('models/classifier.pkl', 'local_classifier.pkl')
+
+# Download directory recursively
+fs.get('data/', 'local_data/', recursive=True)
+print("Data downloaded successfully")
+```
+
+### Walk Directory Tree
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+# Walk through all files
+for root, dirs, files in fs.walk('data/'):
+    print(f"Directory: {root}")
+    for file in files:
+        file_path = fs.join(root, file)
+        size = fs.info(file_path)['size']
+        print(f"  {file}: {size} bytes")
+```
+
+### Check DVC Tracking Status
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+files = ['data/small.csv', 'data/large.bin', 'src/train.py']
+
+for file in files:
+    if fs.exists(file):
+        is_dvc = fs.isdvc(file)
+        status = "DVC-tracked" if is_dvc else "Git-tracked"
+        print(f"{file}: {status}")
+```
+
+### Use with Pandas
+
+```python
+from dvc.api import DVCFileSystem
+import pandas as pd
+
+fs = DVCFileSystem(
+    repo='https://github.com/user/data-repo',
+    rev='v1.0.0'
+)
+
+# Read CSV directly
+with fs.open('data/dataset.csv', mode='r') as f:
+    df = pd.read_csv(f)
+
+print(df.head())
+print(f"Shape: {df.shape}")
+```
+
+### Use with NumPy
+
+```python
+from dvc.api import DVCFileSystem
+import numpy as np
+
+fs = DVCFileSystem()
+
+# Read NumPy array
+with fs.open('data/features.npy', mode='rb') as f:
+    array = np.load(f)
+
+print(f"Shape: {array.shape}")
+print(f"Dtype: {array.dtype}")
+```
+
+### Multiple File Operations
+
+```python
+from dvc.api import DVCFileSystem
+
+# Create filesystem once for multiple operations
+fs = DVCFileSystem(
+    repo='https://github.com/user/repo',
+    rev='main'
+)
+
+# Perform multiple operations efficiently
+files = fs.ls('data/', detail=False)
+
+for file in files:
+    if file.endswith('.csv'):
+        with fs.open(file, mode='r') as f:
+            lines = f.readlines()
+            print(f"{file}: {len(lines)} lines")
+```
+
+### Compare File Sizes
+
+```python
+from dvc.api import DVCFileSystem
+
+fs_main = DVCFileSystem(rev='main')
+fs_dev = DVCFileSystem(rev='development')
+
+file_path = 'data/dataset.csv'
+
+if fs_main.exists(file_path) and fs_dev.exists(file_path):
+    size_main = fs_main.info(file_path)['size']
+    size_dev = fs_dev.info(file_path)['size']
+    
+    print(f"Main branch: {size_main:,} bytes")
+    print(f"Dev branch: {size_dev:,} bytes")
+    print(f"Difference: {abs(size_main - size_dev):,} bytes")
+```
+
+### Get Directory Size
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+# Get total size
+total_size = fs.du('data/', total=True)
+print(f"Total size: {total_size:,} bytes")
+print(f"Total size: {total_size / (1024**3):.2f} GB")
+
+# Get size breakdown
+sizes = fs.du('data/', total=False, withdirs=True)
+for path, size in sizes.items():
+    print(f"{path}: {size:,} bytes")
+```
+
+### Filter DVC-Tracked Files
+
+```python
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+# Find all DVC-tracked files
+dvc_files = []
+for root, dirs, files in fs.walk('./'):
+    for file in files:
+        file_path = fs.join(root, file)
+        if fs.isdvc(file_path):
+            dvc_files.append(file_path)
+
+print(f"Found {len(dvc_files)} DVC-tracked files:")
+for file in dvc_files:
+    print(f"  {file}")
+```
+
+### Access Private Repository
+
+```python
+from dvc.api import DVCFileSystem
+
+# Access private repo via SSH (requires SSH keys configured)
+fs = DVCFileSystem(
+    repo='git@github.com:company/private-ml-repo.git',
+    rev='production'
+)
+
+with fs.open('models/model.pkl', mode='rb') as f:
+    model_data = f.read()
+
+print(f"Loaded {len(model_data)} bytes")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+
+<Card title="Batch Processing" icon="layer-group">
+  Process multiple files from a repository efficiently.
+</Card>
+
+<Card title="Library Integration" icon="puzzle-piece">
+  Use with pandas, PyTorch, TensorFlow via fsspec protocol.
+</Card>
+
+<Card title="Directory Operations" icon="folder">
+  List, walk, and analyze directory structures.
+</Card>
+
+<Card title="Performance" icon="gauge-high">
+  Better performance than `open()`/`read()` for multiple operations.
+</Card>
+
+</CardGroup>
+
+## fsspec Compatibility
+
+`DVCFileSystem` implements the `fsspec` protocol, making it compatible with many libraries:
+
+### Pandas
+
+```python
+import pandas as pd
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem(repo='https://github.com/user/repo')
+
+# Method 1: Direct open
+with fs.open('data/dataset.csv') as f:
+    df = pd.read_csv(f)
+
+# Method 2: Using fsspec protocol
+df = pd.read_csv(
+    'data/dataset.csv',
+    storage_options={'fs': fs}
+)
+```
+
+### PyTorch
+
+```python
+import torch
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+with fs.open('models/model.pt', mode='rb') as f:
+    model = torch.load(f)
+```
+
+### Dask
+
+```python
+import dask.dataframe as dd
+from dvc.api import DVCFileSystem
+
+fs = DVCFileSystem()
+
+ddf = dd.read_csv(
+    'data/*.csv',
+    storage_options={'fs': fs}
+)
+```
+
+## Comparison with dvc.api Functions
+
+| Feature | `DVCFileSystem` | `dvc.api.open()`/`read()` |
+|---------|----------------|---------------------------|
+| **Use Case** | Multiple operations | Single file access |
+| **Performance** | Better for batch | Good for one-off |
+| **API Style** | Object-oriented | Functional |
+| **Features** | Full fs operations | Read-only |
+| **Context** | Reusable instance | One-time operation |
+
+```python
+# DVCFileSystem - Better for multiple operations
+fs = DVCFileSystem(repo='...')
+for file in fs.ls('data/'):
+    with fs.open(file) as f:
+        process(f.read())
+
+# dvc.api.open() - Better for single file
+import dvc.api
+with dvc.api.open('data/file.csv', repo='...') as f:
+    data = f.read()
+```
+
+## Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Reuse filesystem instances">
+  Create one instance and reuse it for multiple operations:
+  
+  ```python
+  # ✅ Good - Reuse instance
+  fs = DVCFileSystem(repo='...')
+  for file in files:
+      with fs.open(file) as f:
+          process(f)
+  
+  # ❌ Bad - Create new instance each time
+  for file in files:
+      fs = DVCFileSystem(repo='...')
+      with fs.open(file) as f:
+          process(f)
+  ```
+</Accordion>
+
+<Accordion title="Use appropriate methods">
+  Choose the right method for your use case:
+  
+  ```python
+  fs = DVCFileSystem()
+  
+  # Check existence before accessing
+  if fs.exists('data/file.csv'):
+      with fs.open('data/file.csv') as f:
+          data = f.read()
+  
+  # Use get() for downloads
+  fs.get('data/', 'local_data/', recursive=True)
+  
+  # Use isdvc() to check DVC tracking
+  if fs.isdvc('large_file.bin'):
+      print("File is DVC-tracked")
+  ```
+</Accordion>
+
+<Accordion title="Close when done">
+  Close the filesystem when finished (or use context manager if available):
+  
+  ```python
+  fs = DVCFileSystem()
+  try:
+      # Do work
+      with fs.open('file.csv') as f:
+          data = f.read()
+  finally:
+      fs.close()
+  ```
+</Accordion>
+
+<Accordion title="Leverage fsspec compatibility">
+  Take advantage of fsspec protocol support in libraries:
+  
+  ```python
+  import pandas as pd
+  from dvc.api import DVCFileSystem
+  
+  fs = DVCFileSystem()
+  
+  # Many libraries can use the filesystem directly
+  df = pd.read_csv(
+      'data/dataset.csv',
+      storage_options={'fs': fs}
+  )
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## Related Functions
+
+<CardGroup cols={3}>
+
+<Card title="open()" icon="folder-open" href="/api/open">
+  Simple file opening
+</Card>
+
+<Card title="read()" icon="file-lines" href="/api/read">
+  Simple file reading
+</Card>
+
+<Card title="get_url()" icon="link" href="/api/get_url">
+  Get storage URL
+</Card>
+
+</CardGroup>
+
+<Info>
+**Advanced Usage**: See the [fsspec documentation](https://filesystem-spec.readthedocs.io/) for more details on the file system protocol and advanced features.
+</Info>

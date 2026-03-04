@@ -1,0 +1,376 @@
+---
+title: 'dvc exp show'
+description: 'Display experiments with their metrics, parameters, and metadata'
+---
+
+## Description
+
+Display a table of experiments with their parameters and metrics. This command provides a comprehensive view of all experiments, allowing you to compare results across different runs and identify the best performing configurations.
+
+<Tip>
+Use `--only-changed` to focus on metrics and parameters that vary across experiments, making it easier to identify what impacts performance.
+</Tip>
+
+## Usage
+
+```bash
+dvc exp show [options]
+```
+
+## Options
+
+### Filtering Options
+
+<ParamField path="-a, --all-branches" type="boolean" default="false">
+  Show experiments derived from the tip of all Git branches.
+  
+  ```bash
+  dvc exp show --all-branches
+  ```
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="boolean" default="false">
+  Show experiments derived from all Git tags.
+  
+  ```bash
+  dvc exp show --all-tags
+  ```
+</ParamField>
+
+<ParamField path="--all-commits" type="boolean" default="false">
+  Show experiments from all Git commits (not just latest).
+</ParamField>
+
+<ParamField path="--rev" type="string[]">
+  Show experiments derived from specific Git revisions.
+  
+  ```bash
+  dvc exp show --rev main --rev feature-branch
+  ```
+</ParamField>
+
+<ParamField path="--num" type="integer" default="1">
+  Show experiments from the last N commits.
+  
+  ```bash
+  dvc exp show --num 5
+  ```
+</ParamField>
+
+<ParamField path="--hide-failed" type="boolean" default="false">
+  Hide failed experiments in the table.
+  
+  ```bash
+  dvc exp show --hide-failed
+  ```
+</ParamField>
+
+<ParamField path="--hide-queued" type="boolean" default="false">
+  Hide queued experiments in the table.
+  
+  ```bash
+  dvc exp show --hide-queued
+  ```
+</ParamField>
+
+<ParamField path="--hide-workspace" type="boolean" default="false">
+  Hide workspace row in the table.
+</ParamField>
+
+### Display Options
+
+<ParamField path="--only-changed" type="boolean" default="false">
+  Only show metrics and parameters with values varying across experiments. Very useful for identifying what parameters affect results.
+  
+  ```bash
+  dvc exp show --only-changed
+  ```
+</ParamField>
+
+<ParamField path="--drop" type="string[]">
+  Remove columns matching the specified regex pattern. Can be used multiple times.
+  
+  ```bash
+  dvc exp show --drop 'params.yaml:data.*' --drop 'metrics.json:train.*'
+  ```
+</ParamField>
+
+<ParamField path="--keep" type="string[]">
+  Preserve only columns matching the specified regex pattern. Can be used multiple times.
+  
+  ```bash
+  dvc exp show --keep 'metrics.*' --keep 'params.yaml:model.*'
+  ```
+</ParamField>
+
+<ParamField path="--param-deps" type="boolean" default="false">
+  Show only parameters that are stage dependencies (defined in `dvc.yaml`).
+  
+  ```bash
+  dvc exp show --param-deps
+  ```
+</ParamField>
+
+<ParamField path="--no-pager" type="boolean" default="false">
+  Do not pipe output into a pager. Useful when redirecting output or in CI/CD.
+  
+  ```bash
+  dvc exp show --no-pager
+  ```
+</ParamField>
+
+<ParamField path="--sha" type="boolean" default="false">
+  Always show Git commit SHAs instead of branch/tag names.
+  
+  ```bash
+  dvc exp show --sha
+  ```
+</ParamField>
+
+### Sorting Options
+
+<ParamField path="--sort-by" type="string">
+  Sort experiments by the specified metric or parameter.
+  
+  ```bash
+  dvc exp show --sort-by metrics.json:accuracy
+  dvc exp show --sort-by params.yaml:train.lr
+  ```
+</ParamField>
+
+<ParamField path="--sort-order" type="string" default="asc">
+  Sort order to use with `--sort-by`. Options: `asc` (ascending) or `desc` (descending).
+  
+  ```bash
+  dvc exp show --sort-by accuracy --sort-order desc
+  ```
+</ParamField>
+
+### Output Format Options
+
+<ParamField path="--json" type="boolean" default="false">
+  Print output in JSON format instead of a human-readable table.
+  
+  ```bash
+  dvc exp show --json > experiments.json
+  ```
+</ParamField>
+
+<ParamField path="--csv" type="boolean" default="false">
+  Print output in CSV format instead of a human-readable table.
+  
+  ```bash
+  dvc exp show --csv > experiments.csv
+  ```
+</ParamField>
+
+<ParamField path="--md, --markdown" type="boolean" default="false">
+  Show output in Markdown table format (GitHub Flavored Markdown).
+  
+  ```bash
+  dvc exp show --md
+  ```
+</ParamField>
+
+<ParamField path="--precision" type="integer" default="5">
+  Round metrics and parameters to N digits after the decimal point.
+  
+  ```bash
+  dvc exp show --precision 3
+  ```
+</ParamField>
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Force re-collection of experiments instead of loading from cache.
+  
+  ```bash
+  dvc exp show --force
+  ```
+</ParamField>
+
+## Examples
+
+### Show all experiments
+
+```bash
+dvc exp show
+```
+
+Output:
+```bash
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┓
+┃ Experiment        ┃ Created ┃ accuracy ┃ loss        ┃ lr     ┃ epochs  ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
+│ workspace         │ -       │ 0.92     │ 0.234       │ 0.001  │ 50      │
+│ ├── exp-a1b2c     │ Mar 04  │ 0.89     │ 0.287       │ 0.01   │ 50      │
+│ └── exp-d3e4f     │ Mar 03  │ 0.85     │ 0.312       │ 0.1    │ 50      │
+│ main              │ Mar 02  │ 0.83     │ 0.351       │ 0.001  │ 30      │
+└───────────────────┴─────────┴──────────┴─────────────┴────────┴─────────┘
+```
+
+### Show only changed values
+
+```bash
+dvc exp show --only-changed
+```
+
+Output:
+```bash
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Experiment        ┃ accuracy ┃ loss        ┃ lr     ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━┩
+│ workspace         │ 0.92     │ 0.234       │ 0.001  │
+│ ├── exp-a1b2c     │ 0.89     │ 0.287       │ 0.01   │
+│ └── exp-d3e4f     │ 0.85     │ 0.312       │ 0.1    │
+│ main              │ 0.83     │ 0.351       │ 0.001  │
+└───────────────────┴──────────┴─────────────┴────────┘
+```
+
+<Info>
+The `epochs` column is hidden because all experiments used the same value.
+</Info>
+
+### Sort by metric
+
+```bash
+dvc exp show --sort-by accuracy --sort-order desc --only-changed
+```
+
+Output:
+```bash
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Experiment        ┃ accuracy ┃ loss        ┃ lr     ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━┩
+│ workspace         │ 0.92     │ 0.234       │ 0.001  │
+│ ├── exp-a1b2c     │ 0.89     │ 0.287       │ 0.01   │
+│ └── exp-d3e4f     │ 0.85     │ 0.312       │ 0.1    │
+│ main              │ 0.83     │ 0.351       │ 0.001  │
+└───────────────────┴──────────┴─────────────┴────────┘
+```
+
+<Tip>
+Sorting by metrics helps quickly identify the best performing experiments.
+</Tip>
+
+### Filter columns with regex
+
+```bash
+dvc exp show --keep 'metrics.*' --only-changed
+```
+
+Output:
+```bash
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Experiment        ┃ accuracy ┃ loss        ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ workspace         │ 0.92     │ 0.234       │
+│ ├── exp-a1b2c     │ 0.89     │ 0.287       │
+│ └── exp-d3e4f     │ 0.85     │ 0.312       │
+│ main              │ 0.83     │ 0.351       │
+└───────────────────┴──────────┴─────────────┘
+```
+
+### Export to CSV
+
+```bash
+dvc exp show --csv > experiments.csv
+```
+
+Output (in `experiments.csv`):
+```csv
+Experiment,Created,accuracy,loss,lr,epochs
+workspace,-,0.92,0.234,0.001,50
+exp-a1b2c,Mar 04,0.89,0.287,0.01,50
+exp-d3e4f,Mar 03,0.85,0.312,0.1,50
+main,Mar 02,0.83,0.351,0.001,30
+```
+
+<Note>
+CSV output is useful for importing results into spreadsheets or data analysis tools.
+</Note>
+
+### Export to JSON
+
+```bash
+dvc exp show --json | jq '.[] | select(.data.metrics.accuracy > 0.9)'
+```
+
+<Info>
+JSON output works great with tools like `jq` for programmatic filtering and analysis.
+</Info>
+
+### Show experiments from multiple branches
+
+```bash
+dvc exp show --rev main --rev feature-branch --only-changed
+```
+
+### Show last 10 commits with experiments
+
+```bash
+dvc exp show --num 10
+```
+
+### Format for documentation
+
+```bash
+dvc exp show --md --only-changed --sort-by accuracy --sort-order desc
+```
+
+Output:
+```markdown
+| Experiment   | accuracy | loss  | lr    |
+|--------------|----------|-------|-------|
+| workspace    | 0.92     | 0.234 | 0.001 |
+| exp-a1b2c    | 0.89     | 0.287 | 0.01  |
+| exp-d3e4f    | 0.85     | 0.312 | 0.1   |
+| main         | 0.83     | 0.351 | 0.001 |
+```
+
+## Understanding the Output
+
+### Experiment Tree Structure
+
+Experiments are shown in a tree structure:
+- **Bold rows** indicate baseline commits (Git commits)
+- **└──** and **├──** symbols show experiment hierarchy
+- **workspace** shows current uncommitted changes
+
+### Column Types
+
+Columns are color-coded by type:
+- **Experiment info** (grey background): Experiment name, creation date, state
+- **Metrics** (orange background): Performance metrics from your model
+- **Parameters** (cyan background): Hyperparameters and configuration
+- **Dependencies** (purple background): Input data checksums
+
+<Warning>
+Failed experiments show **!** in the State column. Use `--hide-failed` to exclude them.
+</Warning>
+
+## Common Workflows
+
+### Find best experiment
+
+```bash
+dvc exp show --sort-by metrics.json:accuracy --sort-order desc --only-changed | head -n 5
+```
+
+### Compare specific parameters
+
+```bash
+dvc exp show --keep 'params.yaml:model.*' --keep 'metrics.json:accuracy'
+```
+
+### Generate report for stakeholders
+
+```bash
+dvc exp show --md --only-changed --hide-failed --sort-by accuracy --sort-order desc > report.md
+```
+
+## Related Commands
+
+- `dvc exp run` - Create new experiments
+- `dvc exp diff` - Compare two specific experiments
+- `dvc exp apply` - Apply experiment to workspace
+- `dvc metrics show` - View metrics without experiment context

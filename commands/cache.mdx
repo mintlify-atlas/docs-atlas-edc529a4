@@ -1,0 +1,316 @@
+---
+title: 'dvc cache'
+description: 'Manage cache settings'
+---
+
+## Description
+
+DVC cache commands help you configure and manage the local cache directory where DVC stores all tracked data and model files. The cache enables efficient storage and sharing of large files across your project.
+
+## Subcommands
+
+### cache dir
+
+Configure cache directory location.
+
+<CodeGroup>
+```bash Show Current Cache Directory
+dvc cache dir
+```
+
+```bash Set Custom Cache Directory
+dvc cache dir /mnt/external/dvc-cache
+```
+
+```bash Set Relative Path
+dvc cache dir ../shared-cache
+```
+
+```bash Unset Custom Path (Use Default)
+dvc cache dir --unset
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="value" type="string" optional>
+  Path to cache directory. If no path is provided, it returns the current cache directory.
+  
+  - Relative paths are resolved relative to the current directory
+  - Path is saved to config relative to the config file location
+  - Default location: `.dvc/cache` within your project
+</ParamField>
+
+#### Options
+
+<ParamField path="-u, --unset" type="flag">
+  Unset the custom cache directory and revert to default location (`.dvc/cache`).
+</ParamField>
+
+<ParamField path="--global" type="flag">
+  Use global config (~/.config/dvc/config).
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config (.dvc/config).
+</ParamField>
+
+<ParamField path="--local" type="flag">
+  Use local config (.dvc/config.local).
+</ParamField>
+
+---
+
+### cache migrate
+
+Migrate cached files to the DVC 3.0 cache location.
+
+<CodeGroup>
+```bash Migrate Cache
+dvc cache migrate
+```
+
+```bash Migrate Cache and DVC Files
+dvc cache migrate --dvc-files
+```
+
+```bash Dry Run (Preview Changes)
+dvc cache migrate --dry
+```
+</CodeGroup>
+
+#### Options
+
+<ParamField path="--dvc-files" type="flag">
+  Migrate entries in all existing DVC files in the repository to the DVC 3.0 format.
+</ParamField>
+
+<ParamField path="--dry" type="flag">
+  Only print actions which would be taken without actually migrating any data.
+</ParamField>
+
+## Examples
+
+### View Current Cache Location
+
+```bash
+$ dvc cache dir
+```
+
+```
+/home/user/myproject/.dvc/cache
+```
+
+### Move Cache to External Drive
+
+```bash
+# Set cache to external drive for more storage space
+dvc cache dir /mnt/external/dvc-cache
+```
+
+```
+$ dvc cache dir
+/mnt/external/dvc-cache
+```
+
+<Tip>
+Using an external drive or network storage for cache is useful when working with large datasets that exceed your local disk capacity.
+</Tip>
+
+### Share Cache Across Multiple Projects
+
+```bash
+# Set a shared cache directory using global config
+dvc cache dir --global /home/user/shared-dvc-cache
+```
+
+This allows multiple DVC projects to share the same cache, saving disk space.
+
+### Reset to Default Location
+
+```bash
+# Remove custom cache directory setting
+dvc cache dir --unset
+```
+
+### Preview Cache Migration
+
+```bash
+# See what would be migrated without making changes
+dvc cache migrate --dry
+```
+
+```
+Migrating cache from DVC 2.x to 3.0 format:
+  - Moving: .dvc/cache/ab/cd1234... -> .dvc/cache/files/md5/ab/cd1234...
+  - Moving: .dvc/cache/12/ef5678... -> .dvc/cache/files/md5/12/ef5678...
+  
+Total: 245 files, 15.3 GB
+```
+
+<Note>
+Use `--dry` to safely preview migration before committing to changes.
+</Note>
+
+### Migrate to DVC 3.0 Format
+
+```bash
+# Migrate cache structure
+dvc cache migrate
+
+# Migrate cache and update all .dvc files
+dvc cache migrate --dvc-files
+```
+
+<Warning>
+Cache migration is a one-way operation. Make sure to backup important data before migrating, especially when using `--dvc-files`.
+</Warning>
+
+## Cache Structure
+
+DVC uses content-addressable storage where files are stored by their hash:
+
+```
+.dvc/cache/
+└── files/
+    └── md5/
+        ├── ab/
+        │   └── cd1234567890abcdef1234567890ab  # File content
+        └── 12/
+            └── ef5678901234abcdef5678901234ef
+```
+
+- Files are stored using their MD5 hash
+- First 2 characters of hash become directory name
+- Rest of hash is the filename
+- Same file content = same cache entry (deduplication)
+
+## Cache Configuration Options
+
+You can configure additional cache behaviors via `dvc config`:
+
+### Cache Type (File Links)
+
+```bash
+# Use hardlinks (default, fastest)
+dvc config cache.type hardlink
+
+# Use symlinks
+dvc config cache.type symlink
+
+# Use reflinks (copy-on-write, requires filesystem support)
+dvc config cache.type reflink
+
+# Use copies (slowest, most compatible)
+dvc config cache.type copy
+```
+
+<AccordionGroup>
+  <Accordion title="hardlink" icon="link">
+    Creates hard links to cache files. Fast and space-efficient. Default option.
+  </Accordion>
+  
+  <Accordion title="symlink" icon="arrow-up-right-from-square">
+    Creates symbolic links to cache files. Good for read-only workflows.
+  </Accordion>
+  
+  <Accordion title="reflink" icon="clone">
+    Copy-on-write links (requires Btrfs, XFS, or APFS). Best of both worlds when supported.
+  </Accordion>
+  
+  <Accordion title="copy" icon="copy">
+    Full file copies. Slowest but most compatible. Use when links aren't available.
+  </Accordion>
+</AccordionGroup>
+
+### Protected Mode
+
+```bash
+# Prevent accidental modification of cached files
+dvc config cache.protected true
+```
+
+### Shared Cache
+
+```bash
+# Allow cache sharing between users (sets proper permissions)
+dvc config cache.shared group
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="External Storage" icon="hard-drive">
+    Move cache to external drive when local disk space is limited.
+  </Card>
+  
+  <Card title="Shared Team Cache" icon="users">
+    Configure a network location for cache to enable team collaboration without redundant downloads.
+  </Card>
+  
+  <Card title="CI/CD Optimization" icon="gears">
+    Use persistent cache directories in CI to speed up pipeline runs.
+  </Card>
+  
+  <Card title="Version Upgrade" icon="arrow-up">
+    Migrate from DVC 2.x to 3.0 cache format for improved performance.
+  </Card>
+</CardGroup>
+
+## Cache vs Remote Storage
+
+<Tip>
+**Cache** is local storage on your machine for fast access.
+
+**Remote** is cloud or network storage for backup and sharing.
+
+Both work together: cache for speed, remote for collaboration.
+</Tip>
+
+| Feature | Cache | Remote |
+|---------|-------|--------|
+| Location | Local machine | Cloud/Network |
+| Purpose | Fast file access | Backup & sharing |
+| Required | Yes | No (but recommended) |
+| Shared | Can be network-mounted | Yes |
+| Configuration | `dvc cache dir` | `dvc remote add` |
+
+## Troubleshooting
+
+### Check Cache Size
+
+```bash
+du -sh .dvc/cache
+```
+
+### Clear Cache
+
+<Warning>
+This will delete all cached files. Only do this if you have a remote backup.
+</Warning>
+
+```bash
+rm -rf .dvc/cache
+```
+
+Run `dvc pull` to restore files from remote.
+
+### Verify Cache Integrity
+
+```bash
+dvc status
+```
+
+Shows which tracked files are missing from cache.
+
+## Related Commands
+
+- `dvc config` - Configure DVC settings including cache options
+- `dvc gc` - Garbage collect unused cache files
+- `dvc pull` - Download files from remote to cache
+- `dvc push` - Upload files from cache to remote
+- `dvc status` - Check status of tracked files and cache

@@ -1,0 +1,322 @@
+---
+title: 'dvc exp apply'
+description: 'Apply changes from an experiment to your workspace'
+---
+
+## Description
+
+Apply the changes from a specific experiment to your current workspace. This command updates your working directory with the code, parameters, and data from a completed experiment, allowing you to continue working from that state or promote it to a regular Git commit.
+
+<Warning>
+This command modifies your workspace. Any uncommitted changes will be overwritten. Commit or stash your current work before applying an experiment.
+</Warning>
+
+## Usage
+
+```bash
+dvc exp apply <experiment>
+```
+
+## Arguments
+
+<ParamField path="experiment" type="string" required>
+  The experiment name to apply to your workspace.
+  
+  Can be:
+  - Auto-generated experiment name (e.g., `exp-a1b2c`)
+  - Custom experiment name (specified with `-n` during `dvc exp run`)
+  
+  ```bash
+  dvc exp apply exp-44136
+  dvc exp apply my-experiment
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--no-force" type="boolean" default="false">
+  Fail if this command would overwrite conflicting changes in the workspace.
+  
+  <Note>
+  The `--no-force` option is deprecated and will be removed in a future DVC release.
+  </Note>
+</ParamField>
+
+## Examples
+
+### Apply a successful experiment
+
+```bash
+# First, view your experiments
+dvc exp show
+
+# Apply the best performing experiment
+dvc exp apply exp-a1b2c
+```
+
+Output:
+```bash
+Changes for experiment 'exp-a1b2c' have been applied to your workspace.
+```
+
+<Info>
+After applying, your workspace now matches the state of the experiment including code, parameters, and outputs.
+</Info>
+
+### Apply and commit
+
+```bash
+# Apply experiment to workspace
+dvc exp apply high-accuracy-run
+
+# Review changes
+git status
+dvc diff
+
+# Commit if satisfied
+git add .
+git commit -m "Apply high accuracy experiment"
+```
+
+Output:
+```bash
+Changes for experiment 'high-accuracy-run' have been applied to your workspace.
+
+On branch main
+Changes not staged for commit:
+  modified:   params.yaml
+  modified:   dvc.lock
+
+Committed changes successfully.
+```
+
+<Tip>
+Applying an experiment doesn't automatically create a Git commit. Review the changes first, then commit when ready.
+</Tip>
+
+### Apply with existing changes
+
+```bash
+# You have uncommitted changes
+git status
+```
+
+Output:
+```bash
+On branch main
+Changes not staged for commit:
+  modified:   train.py
+  modified:   params.yaml
+```
+
+```bash
+# Stash current work
+git stash
+
+# Apply experiment
+dvc exp apply exp-d3e4f
+
+# Review applied changes
+git diff
+
+# If needed, restore your previous work
+git stash pop
+```
+
+<Warning>
+DVC automatically creates a stash at `refs/exps/apply/stash` before applying. You can revert using:
+```bash
+git reset --hard
+git stash apply refs/exps/apply/stash
+```
+</Warning>
+
+### Compare before applying
+
+```bash
+# First, compare the experiment with current workspace
+dvc exp diff HEAD exp-new-model
+
+# If the changes look good, apply them
+dvc exp apply exp-new-model
+```
+
+Output:
+```bash
+Metric
+────────────────────────────────────────────────────────────
+    Path          Metric      HEAD    exp-new-model  diff
+────────────────────────────────────────────────────────────
+    metrics.json  accuracy    0.85    0.92           +0.07
+    metrics.json  loss        0.312   0.234          -0.078
+
+Changes for experiment 'exp-new-model' have been applied to your workspace.
+```
+
+### Apply and create a branch
+
+```bash
+# Create a new branch for the experiment
+git checkout -b feature/new-model
+
+# Apply experiment
+dvc exp apply exp-breakthrough
+
+# Commit changes
+git add .
+git commit -m "feat: Apply breakthrough model architecture"
+
+# Push to remote
+git push -u origin feature/new-model
+```
+
+<Tip>
+This workflow is useful for code review: apply the experiment to a branch, then create a pull request.
+</Tip>
+
+## What Gets Applied
+
+When you apply an experiment, DVC updates:
+
+### 1. Parameters
+- `params.yaml` and other parameter files are updated with experiment values
+- Custom parameter files specified in `dvc.yaml` are also updated
+
+### 2. Code Changes
+- Any code modifications made during the experiment are applied
+- This includes changes to training scripts, preprocessing code, etc.
+
+### 3. DVC Files
+- `dvc.lock` is updated with the experiment's pipeline state
+- Cached outputs from the experiment become accessible
+
+### 4. Metrics
+- Metric files are updated to reflect experiment results
+
+<Note>
+Large data files tracked by DVC are not copied to your workspace. Instead, DVC updates pointers to the cached data. Use `dvc checkout` if you need to materialize the data files.
+</Note>
+
+## Common Workflows
+
+### Experiment Selection Workflow
+
+```bash
+# 1. Run multiple experiments
+dvc exp run --queue -S train.lr=0.1 -n "lr-0.1"
+dvc exp run --queue -S train.lr=0.01 -n "lr-0.01"
+dvc exp run --queue -S train.lr=0.001 -n "lr-0.001"
+dvc exp run --run-all
+
+# 2. Compare results
+dvc exp show --sort-by accuracy --sort-order desc
+
+# 3. Apply the best one
+dvc exp apply lr-0.001
+
+# 4. Commit to Git
+git add .
+git commit -m "feat: Apply best learning rate experiment"
+```
+
+### Safe Experimentation Workflow
+
+```bash
+# 1. Save current state
+git stash
+
+# 2. Apply and test experiment
+dvc exp apply promising-experiment
+
+# 3. Run additional validation
+python scripts/validate.py
+
+# 4a. If good, commit
+git add .
+git commit -m "Apply promising experiment"
+
+# 4b. If not good, revert
+git reset --hard HEAD
+git stash apply refs/exps/apply/stash
+```
+
+### Production Promotion Workflow
+
+```bash
+# 1. Apply production-ready experiment
+git checkout main
+dvc exp apply production-candidate
+
+# 2. Tag the release
+git add .
+git commit -m "release: Deploy model v2.0"
+git tag -a v2.0 -m "Model version 2.0 with 92% accuracy"
+
+# 3. Push to production
+git push origin main --tags
+```
+
+## Reverting Applied Changes
+
+If you need to undo an applied experiment:
+
+```bash
+# Revert all changes (if not committed)
+git reset --hard
+git stash apply refs/exps/apply/stash
+
+# Or if already committed
+git revert HEAD
+```
+
+<Info>
+DVC creates a backup stash at `refs/exps/apply/stash` before each apply operation, allowing you to recover your previous state.
+</Info>
+
+## Troubleshooting
+
+### Merge Conflicts
+
+If applying an experiment causes conflicts:
+
+```bash
+# DVC will show which files have conflicts
+Conflict in params.yaml
+```
+
+Resolve manually:
+```bash
+# Edit conflicting files
+vim params.yaml
+
+# Mark as resolved
+git add params.yaml
+
+# Continue working
+```
+
+### Missing Experiment
+
+If the experiment doesn't exist:
+
+```bash
+dvc exp apply nonexistent-exp
+```
+
+Output:
+```bash
+ERROR: experiment 'nonexistent-exp' not found
+```
+
+List available experiments:
+```bash
+dvc exp show
+```
+
+## Related Commands
+
+- `dvc exp show` - View available experiments
+- `dvc exp diff` - Compare experiments before applying
+- `dvc exp branch` - Promote experiment to a Git branch
+- `dvc exp run` - Create new experiments
+- `dvc checkout` - Checkout DVC-tracked files after applying

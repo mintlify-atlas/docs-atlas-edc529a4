@@ -1,0 +1,459 @@
+---
+title: Installation
+description: Install DVC on your system using pip, conda, brew, snap, chocolatey, or OS-specific packages
+---
+
+## System Requirements
+
+DVC requires:
+- **Python**: 3.9 or higher (3.9, 3.10, 3.11, 3.12, 3.13, 3.14)
+- **Git**: Installed and configured (unless using `--no-scm` mode)
+- **Operating System**: Linux, macOS, or Windows
+
+<Info>
+  DVC works best in Git repositories, but you can use it standalone with the `--no-scm` option during initialization.
+</Info>
+
+## Quick Install
+
+Choose your preferred installation method:
+
+<Tabs>
+  <Tab title="pip">
+    Install DVC using Python's package manager:
+
+    ```bash
+    pip install dvc
+    ```
+
+    Verify the installation:
+
+    ```bash
+    dvc version
+    ```
+
+    <Tip>
+      Use a virtual environment to avoid conflicts with other Python packages:
+      ```bash
+      python -m venv dvc-env
+      source dvc-env/bin/activate  # On Windows: dvc-env\Scripts\activate
+      pip install dvc
+      ```
+    </Tip>
+  </Tab>
+
+  <Tab title="conda">
+    Install using Conda or Mamba (recommended for faster installation):
+
+    ```bash
+    # Using mamba (faster)
+    conda install -c conda-forge mamba
+    mamba install -c conda-forge dvc
+
+    # Or using conda directly
+    conda install -c conda-forge dvc
+    ```
+
+    <Note>
+      Conda packages are maintained on the `conda-forge` channel and include all core dependencies.
+    </Note>
+  </Tab>
+
+  <Tab title="Homebrew (macOS)">
+    Install on macOS using Homebrew:
+
+    ```bash
+    brew install dvc
+    ```
+
+    Update DVC:
+
+    ```bash
+    brew upgrade dvc
+    ```
+  </Tab>
+
+  <Tab title="Snap (Linux)">
+    Install on Linux using Snap:
+
+    ```bash
+    snap install dvc --classic
+    ```
+
+    The `--classic` flag is required for DVC to access your file system.
+
+    <Accordion title="Other Snap Channels">
+      - **Stable**: `snap install dvc --classic` (default, latest release)
+      - **Beta**: `snap install dvc --beta --classic` (release candidates)
+      - **Edge**: `snap install dvc --edge --classic` (latest from main branch)
+    </Accordion>
+  </Tab>
+
+  <Tab title="Chocolatey (Windows)">
+    Install on Windows using Chocolatey:
+
+    ```powershell
+    choco install dvc
+    ```
+
+    Update DVC:
+
+    ```powershell
+    choco upgrade dvc
+    ```
+  </Tab>
+</Tabs>
+
+## Installation with Remote Storage Support
+
+DVC supports multiple remote storage types. Install additional dependencies based on your storage needs:
+
+### Using pip
+
+```bash
+# AWS S3
+pip install 'dvc[s3]'
+
+# Azure Blob Storage
+pip install 'dvc[azure]'
+
+# Google Cloud Storage
+pip install 'dvc[gs]'
+
+# Google Drive
+pip install 'dvc[gdrive]'
+
+# SSH/SFTP
+pip install 'dvc[ssh]'
+
+# Alibaba Cloud OSS
+pip install 'dvc[oss]'
+
+# WebDAV
+pip install 'dvc[webdav]'
+
+# HDFS
+pip install 'dvc[hdfs]'
+
+# WebHDFS
+pip install 'dvc[webhdfs]'
+
+# Install all remote storage types
+pip install 'dvc[all]'
+```
+
+<Tip>
+  You can install multiple storage backends at once:
+  ```bash
+  pip install 'dvc[s3,gs,azure]'
+  ```
+</Tip>
+
+### Using conda
+
+```bash
+# AWS S3
+mamba install -c conda-forge dvc-s3
+
+# Azure Blob Storage  
+mamba install -c conda-forge dvc-azure
+
+# Google Cloud Storage
+mamba install -c conda-forge dvc-gs
+
+# Google Drive
+mamba install -c conda-forge dvc-gdrive
+
+# SSH/SFTP
+mamba install -c conda-forge dvc-ssh
+
+# Alibaba Cloud OSS
+mamba install -c conda-forge dvc-oss
+```
+
+<Note>
+  When using package managers like Snap, Homebrew, or Chocolatey, storage dependencies are included by default.
+</Note>
+
+## OS-Specific Packages
+
+DVC provides self-contained packages for various operating systems.
+
+### Ubuntu / Debian (deb)
+
+```bash
+# Add DVC repository
+sudo wget https://dvc.org/deb/dvc.list -O /etc/apt/sources.list.d/dvc.list
+wget -qO - https://dvc.org/deb/iterative.asc | sudo apt-key add -
+
+# Update and install
+sudo apt update
+sudo apt install dvc
+```
+
+### Fedora / CentOS / RHEL (rpm)
+
+```bash
+# Add DVC repository
+sudo wget https://dvc.org/rpm/dvc.repo -O /etc/yum.repos.d/dvc.repo
+sudo rpm --import https://dvc.org/rpm/iterative.asc
+
+# Update and install
+sudo yum update
+sudo yum install dvc
+```
+
+### Standalone Packages
+
+Download standalone executables for Linux, macOS, and Windows from the [GitHub Releases page](https://github.com/treeverse/dvc/releases).
+
+<Warning>
+  Standalone packages are self-contained but may be larger in size. They're useful for environments where you can't use package managers.
+</Warning>
+
+## Development Version
+
+Install the latest development version from GitHub:
+
+```bash
+pip install "dvc @ git+https://github.com/treeverse/dvc"
+```
+
+<Warning>
+  The development version may contain unreleased features and bugs. Use it only for testing or contributing to DVC.
+</Warning>
+
+## Shell Completion
+
+Enable tab completion for your shell:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    # Add to ~/.bashrc
+    eval "$(dvc completion -s bash)"
+    ```
+  </Tab>
+
+  <Tab title="Zsh">
+    ```bash
+    # Add to ~/.zshrc
+    eval "$(dvc completion -s zsh)"
+    ```
+  </Tab>
+
+  <Tab title="Fish">
+    ```bash
+    # Add to ~/.config/fish/config.fish
+    dvc completion -s fish | source
+    ```
+  </Tab>
+</Tabs>
+
+After adding the completion script, restart your shell or source the configuration file.
+
+## VS Code Extension
+
+Install the [DVC Extension for VS Code](https://marketplace.visualstudio.com/items?itemName=Iterative.dvc) for a visual interface:
+
+<Steps>
+  <Step title="Install the Extension">
+    Search for "DVC" in the VS Code Extensions marketplace or install from the command line:
+
+    ```bash
+    code --install-extension Iterative.dvc
+    ```
+  </Step>
+
+  <Step title="Install DVC CLI">
+    The extension requires the DVC command-line tool to be installed on your system. Follow the installation steps above if you haven't already.
+  </Step>
+
+  <Step title="Open a DVC Project">
+    Open a folder containing a DVC project (with `.dvc` directory) to activate the extension.
+  </Step>
+</Steps>
+
+<Info>
+  The VS Code extension provides experiment tracking, data management, plots visualization, and more — all from within your editor.
+</Info>
+
+## Verifying Installation
+
+Confirm DVC is installed correctly:
+
+```bash
+# Check version
+dvc version
+
+# View help
+dvc --help
+
+# Check which storage backends are available
+pip list | grep dvc
+```
+
+You should see output similar to:
+
+```
+dvc               3.x.x
+dvc-data          x.x.x
+dvc-objects       x.x.x
+dvc-render        x.x.x
+# Plus any storage backends you installed
+dvc-s3            x.x.x
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not found: dvc" icon="circle-exclamation">
+    If `dvc` isn't recognized:
+    
+    1. **Check your PATH**: Ensure the installation directory is in your system's PATH
+    2. **Restart your terminal**: Close and reopen your terminal
+    3. **Virtual environment**: If using venv, make sure it's activated
+    4. **Reinstall**: Try reinstalling DVC using a different method
+  </Accordion>
+
+  <Accordion title="Permission denied errors" icon="lock">
+    On Linux/macOS, you may need to use `sudo` for system-wide installations:
+    
+    ```bash
+    sudo pip install dvc
+    ```
+    
+    Or install for your user only:
+    
+    ```bash
+    pip install --user dvc
+    ```
+  </Accordion>
+
+  <Accordion title="Python version errors" icon="snake">
+    DVC requires Python 3.9+. Check your version:
+    
+    ```bash
+    python --version
+    ```
+    
+    If you have multiple Python versions, use `pip3` or specify the version:
+    
+    ```bash
+    python3.11 -m pip install dvc
+    ```
+  </Accordion>
+
+  <Accordion title="Storage backend not available" icon="cloud">
+    If you get errors like "S3 remote is not supported":
+    
+    1. Install the appropriate storage backend:
+       ```bash
+       pip install 'dvc[s3]'
+       ```
+    2. Verify installation:
+       ```bash
+       pip list | grep dvc
+       ```
+  </Accordion>
+</AccordionGroup>
+
+## Updating DVC
+
+Keep DVC up to date to get the latest features and bug fixes:
+
+<Tabs>
+  <Tab title="pip">
+    ```bash
+    pip install --upgrade dvc
+    ```
+  </Tab>
+
+  <Tab title="conda">
+    ```bash
+    mamba update -c conda-forge dvc
+    # or
+    conda update -c conda-forge dvc
+    ```
+  </Tab>
+
+  <Tab title="Homebrew">
+    ```bash
+    brew upgrade dvc
+    ```
+  </Tab>
+
+  <Tab title="Snap">
+    ```bash
+    snap refresh dvc
+    ```
+  </Tab>
+
+  <Tab title="Chocolatey">
+    ```powershell
+    choco upgrade dvc
+    ```
+  </Tab>
+</Tabs>
+
+## Uninstalling DVC
+
+To remove DVC from your system:
+
+<Tabs>
+  <Tab title="pip">
+    ```bash
+    pip uninstall dvc
+    ```
+  </Tab>
+
+  <Tab title="conda">
+    ```bash
+    conda remove dvc
+    ```
+  </Tab>
+
+  <Tab title="Homebrew">
+    ```bash
+    brew uninstall dvc
+    ```
+  </Tab>
+
+  <Tab title="Snap">
+    ```bash
+    snap remove dvc
+    ```
+  </Tab>
+
+  <Tab title="Chocolatey">
+    ```powershell
+    choco uninstall dvc
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Uninstalling DVC doesn't remove your `.dvc` directories or cached data. To completely clean up, manually delete `.dvc/cache` directories.
+</Note>
+
+## Next Steps
+
+Now that DVC is installed:
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Follow our hands-on tutorial to start using DVC.
+  </Card>
+  
+  <Card title="Initialize a Project" icon="folder-plus" href="/commands/init">
+    Learn how to set up DVC in your repository.
+  </Card>
+  
+  <Card title="Configure Remote Storage" icon="cloud-arrow-up" href="/commands/remote">
+    Set up remote storage for your data.
+  </Card>
+  
+  <Card title="Core Concepts" icon="book" href="/concepts/data-versioning">
+    Understand how DVC works under the hood.
+  </Card>
+</CardGroup>

@@ -1,0 +1,376 @@
+---
+title: 'dvc destroy'
+description: 'Remove DVC files, local DVC config and data cache'
+---
+
+## Description
+
+The `dvc destroy` command removes all DVC-related files from your project, including the `.dvc` directory, configuration files, and local cache. This effectively uninitializes DVC from your repository.
+
+<Warning>
+This is a destructive operation that **deletes your local cache**. Make sure you've pushed important data to a remote storage before running this command.
+</Warning>
+
+## Usage
+
+```bash
+dvc destroy [options]
+```
+
+<CodeGroup>
+```bash With Confirmation
+dvc destroy
+```
+
+```bash Force Destroy (No Confirmation)
+dvc destroy --force
+```
+
+```bash Short Form
+dvc destroy -f
+```
+</CodeGroup>
+
+## Arguments
+
+This command takes no arguments.
+
+## Options
+
+<ParamField path="-f, --force" type="flag">
+  Force destruction without asking for confirmation.
+  
+  By default, DVC asks for user confirmation before destroying the repository. Use this flag to skip the confirmation prompt (useful for automation).
+</ParamField>
+
+## What Gets Deleted
+
+When you run `dvc destroy`, the following are permanently removed:
+
+<AccordionGroup>
+  <Accordion title=".dvc/ Directory" icon="folder-xmark">
+    The entire `.dvc` directory, including:
+    - Configuration files (`.dvc/config`, `.dvc/config.local`)
+    - Local cache (`.dvc/cache/`)
+    - Temporary files
+    - Internal state files
+  </Accordion>
+
+  <Accordion title="Pipeline Information" icon="diagram-project">
+    All information about your data pipelines:
+    - Stage definitions in `dvc.yaml`
+    - Pipeline dependencies and outputs
+    - Metrics and plots configurations
+  </Accordion>
+
+  <Accordion title="Local Cache" icon="database">
+    All cached data files:
+    - Original versions of tracked files
+    - Historical versions from previous commits
+    - Cached pipeline outputs
+    
+    <Warning>
+    **Data in cache is permanently deleted.** Ensure you've run `dvc push` to backup to remote before destroying.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+**What is NOT deleted:**
+- `.dvc` files (e.g., `data.csv.dvc`) - These remain as regular files in your Git repository
+- Remote storage - Data in remote storage (S3, GCS, etc.) is unaffected
+- Git repository - Your Git history and tracked files remain intact
+</Info>
+
+## Examples
+
+### Destroy with Confirmation
+
+```bash
+$ dvc destroy
+```
+
+```
+This will destroy all information about your pipelines, all data files,
+as well as cache in .dvc/cache.
+
+Are you sure you want to continue? [y/n] y
+
+Successfully destroyed DVC repository.
+```
+
+### Destroy Without Confirmation
+
+```bash
+$ dvc destroy --force
+```
+
+```
+Successfully destroyed DVC repository.
+```
+
+<Tip>
+Use `--force` in automated scripts or CI/CD pipelines where user interaction isn't possible.
+</Tip>
+
+## Before You Destroy
+
+<Steps>
+  <Step title="Backup to Remote">
+    Ensure all important data is pushed to remote storage:
+    
+    ```bash
+    dvc push
+    ```
+  </Step>
+  
+  <Step title="Check Status">
+    Verify no uncommitted changes:
+    
+    ```bash
+    dvc status
+    git status
+    ```
+  </Step>
+  
+  <Step title="Document Configuration">
+    Save your DVC configuration if you might need it later:
+    
+    ```bash
+    dvc config --list > dvc-config-backup.txt
+    ```
+  </Step>
+  
+  <Step title="List Tracked Files">
+    Document what files are tracked by DVC:
+    
+    ```bash
+    git ls-files '*.dvc' > dvc-tracked-files.txt
+    ```
+  </Step>
+</Steps>
+
+## After Destruction
+
+After running `dvc destroy`:
+
+### Project State
+
+```bash
+# .dvc directory is gone
+ls .dvc
+# ls: cannot access '.dvc': No such file or directory
+
+# .dvc files remain but are now just regular files
+ls *.dvc
+# data.csv.dvc  model.pkl.dvc
+```
+
+### Cleanup Git Repository
+
+You may want to remove DVC-related files from Git:
+
+```bash
+# Remove .dvc files
+git rm *.dvc
+
+# Remove dvc.yaml and dvc.lock if present
+git rm dvc.yaml dvc.lock
+
+# Commit the changes
+git commit -m "Remove DVC tracking"
+```
+
+### Reinitialize DVC
+
+If you want to start fresh:
+
+```bash
+# Reinitialize DVC
+dvc init
+
+# Reconfigure remote
+dvc remote add -d storage s3://mybucket/dvc-storage
+
+# Pull data from remote
+dvc pull
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Switch to Different Tool" icon="arrows-rotate">
+    Remove DVC when migrating to a different data versioning solution.
+  </Card>
+  
+  <Card title="Clean Installation" icon="broom">
+    Start fresh with a clean DVC setup after configuration issues.
+  </Card>
+  
+  <Card title="Remove from Project" icon="xmark">
+    Permanently remove DVC from a project that no longer needs it.
+  </Card>
+  
+  <Card title="Testing & Development" icon="flask">
+    Quickly reset DVC state during testing or development.
+  </Card>
+</CardGroup>
+
+## Safety Checks
+
+### Dry Run Alternative
+
+DVC destroy doesn't have a dry-run option, but you can check what would be deleted:
+
+```bash
+# Check size of cache
+du -sh .dvc/cache
+
+# List all DVC files
+find . -name "*.dvc"
+
+# List cache contents
+ls -lh .dvc/cache
+```
+
+### Verify Remote Backup
+
+Before destroying, verify your data is safely in remote storage:
+
+```bash
+# Check remote connection
+dvc remote list
+
+# Verify all data is pushed
+dvc status --cloud
+
+# Should show: "Cache and remote 'storage' are in sync."
+```
+
+<Warning>
+If `dvc status --cloud` shows differences, some data hasn't been pushed to remote and will be lost during destroy.
+</Warning>
+
+## Comparison: destroy vs. remove
+
+| Feature | `dvc destroy` | `dvc remove` |
+|---------|---------------|---------------|
+| Scope | Entire DVC setup | Specific stage/file |
+| Deletes cache | Yes, entire cache | Only related files |
+| Deletes .dvc/ | Yes | No |
+| Reversible | No (destructive) | Partially |
+| Removes from Git | No | Yes (with Git commit) |
+
+## Recovery After Accidental Destroy
+
+If you accidentally destroyed DVC:
+
+<Steps>
+  <Step title="Reinitialize DVC">
+    ```bash
+    dvc init
+    ```
+  </Step>
+  
+  <Step title="Restore Configuration">
+    If you have a backup of your config:
+    
+    ```bash
+    # Restore remote configuration
+    dvc remote add -d storage s3://mybucket/dvc-storage
+    ```
+    
+    Or restore from Git history:
+    
+    ```bash
+    git show HEAD:.dvc/config > .dvc/config
+    ```
+  </Step>
+  
+  <Step title="Pull Data from Remote">
+    ```bash
+    dvc pull
+    ```
+    
+    This restores all cached data from remote storage.
+  </Step>
+  
+  <Step title="Verify Status">
+    ```bash
+    dvc status
+    ```
+    
+    Should show everything is in sync.
+  </Step>
+</Steps>
+
+<Info>
+As long as you have:
+1. `.dvc` files in Git
+2. `dvc.yaml` (if using pipelines)
+3. Data in remote storage
+
+You can fully recover by reinitializing and running `dvc pull`.
+</Info>
+
+## Troubleshooting
+
+### Permission Denied
+
+```
+ERROR: Permission denied: '.dvc/cache'
+```
+
+**Solution:** Check file permissions or run with appropriate privileges:
+
+```bash
+sudo dvc destroy --force
+```
+
+### Not a DVC Repository
+
+```
+ERROR: Not inside a DVC repository.
+```
+
+**Solution:** You're not in a DVC-initialized directory. Either:
+- Navigate to the correct directory
+- DVC may already be destroyed
+
+### Files in Use
+
+```
+ERROR: Cannot remove '.dvc/cache': Resource busy
+```
+
+**Solution:** Close any programs accessing DVC cache files, then try again.
+
+## Automation Example
+
+### CI/CD Pipeline Cleanup
+
+```bash
+#!/bin/bash
+# Cleanup script for CI/CD
+
+set -e
+
+echo "Backing up to remote..."
+dvc push || true  # Continue even if push fails
+
+echo "Destroying DVC repository..."
+dvc destroy --force
+
+echo "Removing DVC files from Git..."
+git rm -rf *.dvc dvc.yaml dvc.lock 2>/dev/null || true
+
+echo "Cleanup complete."
+```
+
+## Related Commands
+
+- `dvc init` - Initialize DVC (opposite of destroy)
+- `dvc push` - Upload data to remote before destroying
+- `dvc status --cloud` - Check if data is backed up to remote
+- `dvc remove` - Remove specific DVC-tracked files (not entire setup)
+- `dvc gc` - Clean up cache without destroying DVC setup

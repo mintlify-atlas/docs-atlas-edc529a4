@@ -1,0 +1,409 @@
+---
+title: 'dvc config'
+description: 'Get or set config options'
+---
+
+## Description
+
+The `dvc config` command allows you to view and modify DVC configuration settings. Configuration can be set at different levels (local, project, global, system) and controls behavior like remote storage, cache settings, and user preferences.
+
+## Usage
+
+```bash
+dvc config [options] [name] [value]
+```
+
+<CodeGroup>
+```bash List All Config
+dvc config --list
+```
+
+```bash Get a Value
+dvc config core.remote
+```
+
+```bash Set a Value
+dvc config core.autostage true
+```
+
+```bash Unset a Value
+dvc config core.autostage --unset
+```
+
+```bash Remote Configuration
+dvc config remote.myremote.url s3://mybucket/path
+```
+</CodeGroup>
+
+## Arguments
+
+<ParamField path="name" type="string" optional>
+  Option name in format:
+  - `section.option` - For core settings (e.g., `core.autostage`)
+  - `remote.name.option` - For remote settings (e.g., `remote.storage.url`)
+  - `db.name.option` - For database settings
+</ParamField>
+
+<ParamField path="value" type="string" optional>
+  Value to set for the option. Omit to get current value.
+</ParamField>
+
+## Options
+
+<ParamField path="-u, --unset" type="flag">
+  Unset (remove) the specified option.
+</ParamField>
+
+<ParamField path="-l, --list" type="flag">
+  List all defined config values.
+</ParamField>
+
+<ParamField path="--show-origin" type="flag">
+  Show the source file containing each config value.
+</ParamField>
+
+### Configuration Levels
+
+<ParamField path="--local" type="flag">
+  Use local config (`.dvc/config.local`).
+  
+  **Not tracked by Git** - Use for machine-specific settings and **credentials**.
+</ParamField>
+
+<ParamField path="--project" type="flag">
+  Use project config (`.dvc/config`).
+  
+  **Tracked by Git** - Use for project-wide settings shared across team.
+</ParamField>
+
+<ParamField path="--global" type="flag">
+  Use global config (`~/.config/dvc/config`).
+  
+  User-wide settings across all DVC projects.
+</ParamField>
+
+<ParamField path="--system" type="flag">
+  Use system config (`/etc/dvc/config`).
+  
+  System-wide settings for all users.
+</ParamField>
+
+## Examples
+
+### List All Configuration
+
+```bash
+$ dvc config --list
+```
+
+```
+core.remote=storage
+core.autostage=true
+cache.type=hardlink
+remote.storage.url=s3://mybucket/dvc-storage
+```
+
+### List Config with Origins
+
+```bash
+$ dvc config --list --show-origin
+```
+
+```
+.dvc/config     core.remote=storage
+.dvc/config     core.autostage=true
+.dvc/config     remote.storage.url=s3://mybucket/dvc-storage
+.dvc/config.local       remote.storage.access_key_id=AKIA...
+```
+
+<Info>
+The `--show-origin` flag shows which config file contains each setting, helpful for debugging configuration issues.
+</Info>
+
+### Get Specific Value
+
+```bash
+$ dvc config core.remote
+```
+
+```
+storage
+```
+
+### Set Core Options
+
+```bash
+# Enable autostage (auto stage dvc.lock changes)
+dvc config core.autostage true
+
+# Set default remote
+dvc config core.remote storage
+
+# Disable analytics
+dvc config core.analytics false
+
+# Check updates on startup
+dvc config core.check_update true
+```
+
+### Configure Remote Storage
+
+```bash
+# Set remote URL (project level, tracked by Git)
+dvc config remote.storage.url s3://mybucket/dvc-storage
+
+# Set credentials (local level, NOT tracked by Git)
+dvc config --local remote.storage.access_key_id AKIAIOSFODNN7EXAMPLE
+dvc config --local remote.storage.secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+# Set region
+dvc config remote.storage.region us-east-1
+```
+
+<Warning>
+**Security:** Always use `--local` flag when setting credentials. Local config is not tracked by Git.
+</Warning>
+
+### Configure Cache Settings
+
+```bash
+# Set cache directory
+dvc config cache.dir /mnt/external/dvc-cache
+
+# Set cache type (hardlink, symlink, reflink, copy)
+dvc config cache.type hardlink
+
+# Enable protected mode (read-only cache files)
+dvc config cache.protected true
+
+# Enable shared cache for multiple users
+dvc config cache.shared group
+```
+
+### Unset Configuration
+
+```bash
+# Remove a setting
+dvc config core.autostage --unset
+
+# Remove remote credentials
+dvc config --local remote.storage.access_key_id --unset
+```
+
+### Global Configuration
+
+```bash
+# Set global cache directory for all projects
+dvc config --global cache.dir ~/shared-dvc-cache
+
+# Disable analytics globally
+dvc config --global core.analytics false
+```
+
+## Common Configuration Options
+
+### Core Settings
+
+<ParamField path="core.remote" type="string">
+  Default remote storage name.
+</ParamField>
+
+<ParamField path="core.autostage" type="boolean">
+  Automatically stage `dvc.lock` and `.gitignore` changes.
+</ParamField>
+
+<ParamField path="core.analytics" type="boolean">
+  Enable anonymous usage analytics.
+</ParamField>
+
+<ParamField path="core.check_update" type="boolean">
+  Check for DVC updates on startup.
+</ParamField>
+
+<ParamField path="core.no_scm" type="boolean">
+  Use DVC without Git or other SCM.
+</ParamField>
+
+### Cache Settings
+
+<ParamField path="cache.dir" type="string">
+  Custom cache directory location.
+</ParamField>
+
+<ParamField path="cache.type" type="string">
+  File link type: `hardlink`, `symlink`, `reflink`, or `copy`.
+</ParamField>
+
+<ParamField path="cache.protected" type="boolean">
+  Make cache files read-only to prevent accidental modification.
+</ParamField>
+
+<ParamField path="cache.shared" type="string">
+  Enable cache sharing: `group` or `all`.
+</ParamField>
+
+### Remote Settings
+
+<ParamField path="remote.<name>.url" type="string">
+  Remote storage URL.
+</ParamField>
+
+<ParamField path="remote.<name>.access_key_id" type="string">
+  AWS access key ID (S3 remotes).
+</ParamField>
+
+<ParamField path="remote.<name>.secret_access_key" type="string">
+  AWS secret access key (S3 remotes).
+</ParamField>
+
+<ParamField path="remote.<name>.region" type="string">
+  AWS region (S3 remotes).
+</ParamField>
+
+<ParamField path="remote.<name>.profile" type="string">
+  AWS profile name.
+</ParamField>
+
+<ParamField path="remote.<name>.endpointurl" type="string">
+  Custom S3 endpoint URL.
+</ParamField>
+
+### Plots Settings
+
+<ParamField path="plots.html_template" type="string">
+  Custom HTML template for plot visualization.
+</ParamField>
+
+<ParamField path="plots.auto_open" type="boolean">
+  Automatically open plots in browser.
+</ParamField>
+
+<ParamField path="plots.out_dir" type="string">
+  Default output directory for plots.
+</ParamField>
+
+## Configuration Levels (Precedence)
+
+Configuration is read in the following order (later overrides earlier):
+
+<Steps>
+  <Step title="System Config (/etc/dvc/config)">
+    System-wide settings for all users.
+  </Step>
+  
+  <Step title="Global Config (~/.config/dvc/config)">
+    User-wide settings across all projects.
+  </Step>
+  
+  <Step title="Project Config (.dvc/config)">
+    Project-specific settings, **tracked by Git**.
+  </Step>
+  
+  <Step title="Local Config (.dvc/config.local)">
+    Machine-specific settings, **NOT tracked by Git**.
+  </Step>
+</Steps>
+
+<Tip>
+**Best Practice:**
+- Project settings (URLs, shared options) → `.dvc/config` (tracked)
+- Credentials and machine-specific settings → `.dvc/config.local` (not tracked)
+- Personal preferences → `~/.config/dvc/config` (global)
+</Tip>
+
+## Configuration File Format
+
+DVC config files use INI format:
+
+```ini .dvc/config
+[core]
+    remote = storage
+    autostage = true
+
+[remote "storage"]
+    url = s3://mybucket/dvc-storage
+    region = us-east-1
+
+[cache]
+    type = hardlink
+    protected = true
+```
+
+```ini .dvc/config.local
+[remote "storage"]
+    access_key_id = AKIAIOSFODNN7EXAMPLE
+    secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Team Collaboration" icon="users">
+    Set project-wide defaults in `.dvc/config` for consistent team experience.
+  </Card>
+  
+  <Card title="Secure Credentials" icon="lock">
+    Store sensitive credentials in `.dvc/config.local` (not tracked by Git).
+  </Card>
+  
+  <Card title="Personal Preferences" icon="user">
+    Configure global settings for your workflow across all projects.
+  </Card>
+  
+  <Card title="CI/CD Setup" icon="gears">
+    Configure system-level cache locations and credentials for build servers.
+  </Card>
+</CardGroup>
+
+## Environment Variables
+
+DVC config can also be set via environment variables:
+
+```bash
+# Override remote URL
+export DVC_REMOTE_STORAGE_URL=s3://mybucket/dvc-storage
+
+# Set credentials
+export DVC_REMOTE_STORAGE_ACCESS_KEY_ID=AKIA...
+export DVC_REMOTE_STORAGE_SECRET_ACCESS_KEY=wJalr...
+
+# Disable analytics
+export DVC_CORE_ANALYTICS=false
+```
+
+Format: `DVC_<SECTION>_<NAME>_<OPTION>` (uppercase)
+
+<Info>
+Environment variables have the highest precedence and override all config files.
+</Info>
+
+## Troubleshooting
+
+### View Effective Configuration
+
+```bash
+# See all config values and where they come from
+dvc config --list --show-origin
+```
+
+### Reset to Defaults
+
+```bash
+# Remove all custom settings
+rm .dvc/config.local
+dvc config --list --unset
+```
+
+### Config Not Found Error
+
+```
+ERROR: Not inside a DVC repo
+```
+
+**Solution:** Some config levels (project, local) require being inside a DVC repository.
+
+## Related Commands
+
+- `dvc remote` - Specialized commands for remote configuration
+- `dvc cache` - Specialized commands for cache configuration
+- `dvc init` - Initialize DVC repository with default config

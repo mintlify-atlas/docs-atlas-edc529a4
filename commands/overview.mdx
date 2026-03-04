@@ -1,0 +1,181 @@
+---
+title: Commands overview
+description: Complete reference of all DVC commands organized by category
+---
+
+DVC provides a comprehensive set of commands for managing data, pipelines, experiments, and collaboration. This page lists documented commands organized by their primary function.
+
+## Initialize & setup
+
+<CardGroup cols={2}>
+  <Card title="init" icon="rocket" href="/commands/init">
+    Initialize DVC repository
+  </Card>
+  <Card title="config" icon="gear" href="/commands/config">
+    Get or set config options
+  </Card>
+  <Card title="destroy" icon="trash" href="/commands/destroy">
+    Remove DVC files, local DVC config and data cache
+  </Card>
+  <Card title="version" icon="tag" href="/commands/version">
+    Display DVC version and system/environment information
+  </Card>
+</CardGroup>
+
+## Data management
+
+<CardGroup cols={2}>
+  <Card title="add" icon="plus" href="/commands/add">
+    Track data files or directories with DVC
+  </Card>
+  <Card title="checkout" icon="arrow-rotate-left" href="/commands/checkout">
+    Checkout data files from cache
+  </Card>
+  <Card title="commit" icon="check" href="/commands/commit">
+    Save changed data to cache
+  </Card>
+  <Card title="status" icon="circle-info" href="/commands/status">
+    Show changed stages and compare local cache with remote storage
+  </Card>
+  <Card title="diff" icon="code-compare" href="/commands/diff">
+    Show added, modified, or deleted data between commits
+  </Card>
+</CardGroup>
+
+## Remote storage
+
+<CardGroup cols={2}>
+  <Card title="remote" icon="server" href="/commands/remote">
+    Set up and manage data remotes
+  </Card>
+  <Card title="push" icon="cloud-arrow-up" href="/commands/push">
+    Upload tracked files or directories to remote storage
+  </Card>
+  <Card title="pull" icon="cloud-arrow-down" href="/commands/pull">
+    Download tracked files or directories from remote storage
+  </Card>
+  <Card title="fetch" icon="download" href="/commands/fetch">
+    Download files or directories from remote storage to cache
+  </Card>
+</CardGroup>
+
+## Pipelines & stages
+
+<CardGroup cols={2}>
+  <Card title="stage" icon="diagram-project" href="/commands/stage">
+    Commands to list and create stages
+  </Card>
+  <Card title="run" icon="play" href="/commands/run">
+    Legacy command (deprecated - use stage add instead)
+  </Card>
+  <Card title="repro" icon="play" href="/commands/repro">
+    Reproduce complete or partial pipelines by executing stages
+  </Card>
+  <Card title="dag" icon="network-wired" href="/commands/dag">
+    Visualize DVC project DAG (directed acyclic graph)
+  </Card>
+</CardGroup>
+
+## Experiments
+
+<CardGroup cols={2}>
+  <Card title="exp run" icon="flask" href="/commands/exp-run">
+    Run a new experiment
+  </Card>
+  <Card title="exp show" icon="table" href="/commands/exp-show">
+    Display experiments and their metrics
+  </Card>
+  <Card title="exp diff" icon="code-compare" href="/commands/exp-diff">
+    Compare experiments
+  </Card>
+  <Card title="exp apply" icon="check" href="/commands/exp-apply">
+    Apply an experiment to the workspace
+  </Card>
+  <Card title="exp branch" icon="code-branch" href="/commands/exp-branch">
+    Create a Git branch from an experiment
+  </Card>
+  <Card title="exp remove" icon="trash" href="/commands/exp-remove">
+    Remove experiments
+  </Card>
+</CardGroup>
+
+## Metrics & parameters
+
+<CardGroup cols={2}>
+  <Card title="metrics" icon="chart-line" href="/commands/metrics">
+    Commands to display and compare metrics
+  </Card>
+  <Card title="params" icon="sliders" href="/commands/params">
+    Commands to display params
+  </Card>
+  <Card title="plots" icon="chart-column" href="/commands/plots">
+    Commands to visualize and compare plot data
+  </Card>
+</CardGroup>
+
+## Cache management
+
+<CardGroup cols={2}>
+  <Card title="cache" icon="box-archive" href="/commands/cache">
+    Manage cache settings
+  </Card>
+</CardGroup>
+
+## Command categories
+
+### By use case
+
+- **Getting started**: `init`, `config`, `remote`, `add`
+- **Daily workflow**: `status`, `add`, `push`, `pull`, `checkout`
+- **Pipeline development**: `stage`, `repro`, `dag`, `params`, `metrics`
+- **Experimentation**: `exp run`, `exp show`, `exp diff`
+- **Data analysis**: `metrics`, `plots`, `params`, `diff`
+- **Collaboration**: `push`, `pull`, `fetch`, `remote`
+- **Maintenance**: `cache`, `destroy`
+
+### By data flow
+
+1. **Track**: `add`
+2. **Store**: `push`, `commit`, `cache`
+3. **Retrieve**: `pull`, `fetch`, `checkout`
+4. **Inspect**: `status`, `diff`
+
+## Getting help
+
+For detailed help on any command, use:
+
+```bash
+dvc <command> --help
+```
+
+Or for subcommands:
+
+```bash
+dvc <command> <subcommand> --help
+```
+
+## Common options
+
+Most DVC commands support these common options:
+
+- `-h, --help` - Show help message
+- `-q, --quiet` - Be quiet (less output)
+- `-v, --verbose` - Be verbose (more output)
+- `--version` - Show program version
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with DVC in 5 minutes
+  </Card>
+  <Card title="User guides" icon="book" href="/guide/tracking-data">
+    Step-by-step guides for common workflows
+  </Card>
+  <Card title="Python API" icon="code" href="/api/overview">
+    Python API documentation
+  </Card>
+  <Card title="Configuration" icon="gear" href="/config/overview">
+    Learn about DVC configuration options
+  </Card>
+</CardGroup>

@@ -1,0 +1,193 @@
+---
+title: 'dvc metrics'
+description: 'Commands to display and compare metrics'
+---
+
+## Description
+
+DVC metrics commands help you track, display, and compare machine learning metrics across different experiments, commits, branches, and tags. Metrics are numerical values that measure model performance (e.g., accuracy, loss, precision).
+
+## Subcommands
+
+### metrics show
+
+Print metrics with optional formatting.
+
+<CodeGroup>
+```bash Basic Usage
+dvc metrics show
+```
+
+```bash Specific Files
+dvc metrics show metrics.json results/scores.yaml
+```
+
+```bash All Branches
+dvc metrics show --all-branches
+```
+
+```bash JSON Output
+dvc metrics show --json
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="targets" type="list" optional>
+  Limit command scope to these metrics files. Using `-R`, directories to search metrics files in can also be given.
+</ParamField>
+
+#### Options
+
+<ParamField path="-a, --all-branches" type="flag">
+  Show metrics for all branches.
+</ParamField>
+
+<ParamField path="-T, --all-tags" type="flag">
+  Show metrics for all tags.
+</ParamField>
+
+<ParamField path="-A, --all-commits" type="flag">
+  Show metrics for all commits.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Show output in JSON format.
+</ParamField>
+
+<ParamField path="--md" type="flag">
+  Show tabulated output in the Markdown format (GFM).
+</ParamField>
+
+<ParamField path="-R, --recursive" type="flag">
+  If any target is a directory, recursively search and process metrics files.
+</ParamField>
+
+<ParamField path="--precision" type="integer">
+  Round metrics to `n` digits precision after the decimal point. Rounds to 5 digits by default.
+</ParamField>
+
+#### Example Output
+
+```bash
+$ dvc metrics show
+```
+
+```
+Path              auc      loss
+metrics.json      0.95678  0.21344
+```
+
+<Tip>
+Use `--json` flag when you need to programmatically parse metrics output.
+</Tip>
+
+---
+
+### metrics diff
+
+Show changes in metrics between commits in the DVC repository, or between a commit and the workspace.
+
+<CodeGroup>
+```bash Compare HEAD with Workspace
+dvc metrics diff
+```
+
+```bash Compare Two Commits
+dvc metrics diff HEAD~1 HEAD
+```
+
+```bash Show All Metrics (Including Unchanged)
+dvc metrics diff --all
+```
+
+```bash Markdown Format
+dvc metrics diff --md
+```
+</CodeGroup>
+
+#### Arguments
+
+<ParamField path="a_rev" type="string" default="HEAD" optional>
+  Old Git commit to compare (defaults to HEAD).
+</ParamField>
+
+<ParamField path="b_rev" type="string" default="workspace" optional>
+  New Git commit to compare (defaults to the current workspace).
+</ParamField>
+
+#### Options
+
+<ParamField path="--targets" type="list" optional>
+  Specific metrics file(s) to compare (even if not found as `metrics` in `dvc.yaml`). Using `-R`, directories to search metrics files in can also be given. Shows all tracked metrics by default.
+</ParamField>
+
+<ParamField path="-R, --recursive" type="flag">
+  If any target is a directory, recursively search and process metrics files.
+</ParamField>
+
+<ParamField path="--all" type="flag">
+  Show unchanged metrics as well.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Show output in JSON format.
+</ParamField>
+
+<ParamField path="--md" type="flag">
+  Show tabulated output in the Markdown format (GFM).
+</ParamField>
+
+<ParamField path="--no-path" type="flag">
+  Don't show metric path.
+</ParamField>
+
+<ParamField path="--precision" type="integer">
+  Round metrics to `n` digits precision after the decimal point. Rounds to 5 digits by default.
+</ParamField>
+
+#### Example Output
+
+```bash
+$ dvc metrics diff
+```
+
+```
+Path              Metric    HEAD     workspace  Change
+metrics.json      auc       0.95234  0.95678    0.00444
+metrics.json      loss      0.23456  0.21344    -0.02112
+```
+
+<Note>
+By default, only changed metrics are shown. Use `--all` to see unchanged metrics.
+</Note>
+
+<Warning>
+Metrics diff requires Git commits. Make sure your changes are committed before comparing.
+</Warning>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Track Model Performance" icon="chart-line">
+    Monitor how your model metrics change across experiments and iterations.
+  </Card>
+  
+  <Card title="Compare Branches" icon="code-branch">
+    Evaluate metric differences between feature branches and main branch.
+  </Card>
+  
+  <Card title="A/B Testing" icon="flask">
+    Compare different model architectures or hyperparameter configurations.
+  </Card>
+  
+  <Card title="CI/CD Integration" icon="gears">
+    Automate metric reporting in continuous integration pipelines with `--json` output.
+  </Card>
+</CardGroup>
+
+## Related Commands
+
+- `dvc params` - Compare parameters across experiments
+- `dvc plots` - Visualize metrics as plots
+- `dvc exp show` - Show metrics for experiments

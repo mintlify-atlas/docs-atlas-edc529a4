@@ -1,0 +1,269 @@
+---
+title: Configuration Overview
+description: Understanding DVC configuration files and their hierarchy
+---
+
+DVC uses a hierarchical configuration system to manage project settings, remote storage, and various options. This guide explains the different configuration files and how they work together.
+
+## Configuration Files
+
+DVC supports multiple configuration levels that shadow each other in a specific order:
+
+<CardGroup cols={2}>
+  <Card title="System Config" icon="server">
+    System-wide settings for all users
+  </Card>
+  <Card title="Global Config" icon="globe">
+    User-specific settings across all projects
+  </Card>
+  <Card title="Project Config" icon="folder">
+    Repository-specific settings in `.dvc/config`
+  </Card>
+  <Card title="Local Config" icon="lock">
+    Local overrides in `.dvc/config.local` (git-ignored)
+  </Card>
+</CardGroup>
+
+### Configuration Hierarchy
+
+Configurations are merged in the following order (later levels override earlier ones):
+
+1. **System** (`/etc/xdg/dvc/config` on Linux)
+2. **Global** (`~/.config/dvc/config` on Linux)
+3. **Project** (`.dvc/config` - tracked by Git)
+4. **Local** (`.dvc/config.local` - not tracked by Git)
+
+<Note>
+  The local config file is git-ignored by default, making it perfect for storing
+  sensitive information like access keys or user-specific paths.
+</Note>
+
+## DVC File Types
+
+DVC uses several file types to manage your data and pipelines:
+
+### .dvc Files
+
+`.dvc` files are single-stage files that track data files and directories. They contain metadata about:
+
+- File paths
+- MD5 checksums
+- Dependencies
+- Outputs
+
+```yaml
+outs:
+- md5: a304afb96060aad90176268345e10355
+  size: 37891850
+  path: model.pkl
+```
+
+### dvc.yaml
+
+`dvc.yaml` is a multi-stage pipeline file that defines:
+
+- Pipeline stages and their commands
+- Dependencies between stages
+- Parameters and metrics
+- Plots and artifacts
+
+```yaml
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - train.py
+      - data/train.csv
+    params:
+      - lr
+      - epochs
+    outs:
+      - model.pkl
+```
+
+### dvc.lock
+
+`dvc.lock` is automatically generated to lock the state of your pipeline, including:
+
+- Exact checksums of all dependencies and outputs
+- Parameter values used
+- Command that was run
+
+<Warning>
+  Don't edit `dvc.lock` manually. It's automatically managed by DVC to ensure
+  reproducibility.
+</Warning>
+
+## Configuration Sections
+
+DVC configuration files use INI format with the following main sections:
+
+### core
+
+General DVC behavior settings:
+
+<ParamField path="core.remote" type="string">
+  Default remote storage to use for `dvc push`/`dvc pull`
+</ParamField>
+
+<ParamField path="core.autostage" type="boolean" default="false">
+  Automatically stage changes to DVC files with Git
+</ParamField>
+
+<ParamField path="core.check_update" type="boolean" default="true">
+  Check for DVC updates
+</ParamField>
+
+<ParamField path="core.analytics" type="boolean" default="true">
+  Send anonymous usage analytics
+</ParamField>
+
+### cache
+
+Local cache configuration:
+
+<ParamField path="cache.dir" type="string">
+  Location of the cache directory (default: `.dvc/cache`)
+</ParamField>
+
+<ParamField path="cache.type" type="string">
+  Link type for cache: `reflink`, `hardlink`, `symlink`, or `copy`
+</ParamField>
+
+<ParamField path="cache.shared" type="string">
+  Make cache group-writable (`group`)
+</ParamField>
+
+### remote
+
+Remote storage configurations. See [Remote Configuration](/config/remote-config) for details.
+
+```ini
+['remote "myremote"']
+    url = s3://mybucket/path
+    region = us-east-1
+```
+
+### state
+
+<Note>
+  The `state` section is deprecated and no longer used in recent DVC versions.
+</Note>
+
+## Working with Configuration
+
+### View Configuration
+
+List all configuration values:
+
+```bash
+dvc config --list
+```
+
+Show configuration with file origins:
+
+```bash
+dvc config --list --show-origin
+```
+
+### Set Configuration
+
+Set a project-level configuration:
+
+```bash
+dvc config core.remote myremote
+```
+
+Set a global configuration:
+
+```bash
+dvc config --global user.name "John Doe"
+```
+
+Set a local (git-ignored) configuration:
+
+```bash
+dvc config --local remote.myremote.access_key_id AKIAIOSFODNN7EXAMPLE
+```
+
+### Unset Configuration
+
+Remove a configuration value:
+
+```bash
+dvc config --unset core.remote
+```
+
+## Configuration Format
+
+DVC configuration files use the INI format with special handling for named sections:
+
+```ini
+[core]
+    remote = myremote
+    autostage = true
+
+['remote "myremote"']
+    url = s3://mybucket/path
+    region = us-east-1
+
+['remote "backup"']
+    url = gs://backup-bucket
+```
+
+<Info>
+  Named sections like `remote` and `machine` use double quotes in their section
+  names to support spaces and special characters.
+</Info>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use local config for credentials">
+    Store sensitive credentials in `.dvc/config.local` which is git-ignored:
+    
+    ```bash
+    dvc config --local remote.storage.access_key_id YOUR_KEY
+    dvc config --local remote.storage.secret_access_key YOUR_SECRET
+    ```
+  </Accordion>
+
+  <Accordion title="Set default remote at project level">
+    Configure the default remote in `.dvc/config` (tracked by Git):
+    
+    ```bash
+    dvc config core.remote storage
+    ```
+    
+    This ensures all team members use the same default remote.
+  </Accordion>
+
+  <Accordion title="Use relative paths when possible">
+    For local remotes, use relative paths to make the configuration portable:
+    
+    ```bash
+    dvc config remote.storage.url ../shared-storage
+    ```
+  </Accordion>
+
+  <Accordion title="Organize remotes by purpose">
+    Use descriptive names for different storage purposes:
+    
+    ```bash
+    dvc remote add storage s3://production-data
+    dvc remote add backup s3://backup-bucket  
+    dvc remote add shared /mnt/shared
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DVC Files" icon="file" href="/config/dvc-files">
+    Deep dive into .dvc and dvc.yaml file formats
+  </Card>
+  <Card title="Remote Config" icon="cloud" href="/config/remote-config">
+    Configure remote storage for your data
+  </Card>
+</CardGroup>

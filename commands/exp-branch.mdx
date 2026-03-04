@@ -1,0 +1,360 @@
+---
+title: 'dvc exp branch'
+description: 'Promote an experiment to a Git branch'
+---
+
+## Description
+
+Promote an experiment to a permanent Git branch. This command creates a Git branch from an experiment, making it part of your regular Git history. This is useful when you want to preserve a successful experiment as a permanent branch for collaboration, code review, or deployment.
+
+<Tip>
+Use this command to convert temporary experiments into permanent branches that can be pushed to remote repositories and shared with your team.
+</Tip>
+
+## Usage
+
+```bash
+dvc exp branch <experiment> [branch]
+```
+
+## Arguments
+
+<ParamField path="experiment" type="string" required>
+  The experiment name to promote to a branch.
+  
+  Can be:
+  - Auto-generated experiment name (e.g., `exp-a1b2c`)
+  - Custom experiment name (specified with `-n` during `dvc exp run`)
+  
+  ```bash
+  dvc exp branch exp-44136
+  dvc exp branch high-accuracy-run
+  ```
+</ParamField>
+
+<ParamField path="branch" type="string" optional>
+  Name for the new Git branch. If not specified, defaults to `{experiment-name}-branch`.
+  
+  ```bash
+  dvc exp branch exp-a1b2c feature/new-model
+  dvc exp branch my-experiment  # Creates 'my-experiment-branch'
+  ```
+</ParamField>
+
+## Examples
+
+### Create branch with auto-generated name
+
+```bash
+dvc exp branch exp-a1b2c
+```
+
+Output:
+```bash
+Git branch 'exp-a1b2c-branch' has been created from experiment 'exp-a1b2c'.
+```
+
+<Info>
+The default branch name is the experiment name with `-branch` appended.
+</Info>
+
+### Create branch with custom name
+
+```bash
+dvc exp branch high-accuracy-run feature/improved-model
+```
+
+Output:
+```bash
+Git branch 'feature/improved-model' has been created from experiment 'high-accuracy-run'.
+```
+
+<Tip>
+Use descriptive branch names following your team's Git conventions (e.g., `feature/`, `experiment/`, `model/`).
+</Tip>
+
+### Push branch to remote
+
+```bash
+# Create branch from experiment
+dvc exp branch exp-d3e4f experiment/lr-optimization
+
+# Push to remote for collaboration
+git push -u origin experiment/lr-optimization
+```
+
+Output:
+```bash
+Git branch 'experiment/lr-optimization' has been created from experiment 'exp-d3e4f'.
+
+To https://github.com/user/repo.git
+ * [new branch]      experiment/lr-optimization -> experiment/lr-optimization
+Branch 'experiment/lr-optimization' set up to track remote branch 'experiment/lr-optimization' from 'origin'.
+```
+
+### Create branch and switch to it
+
+```bash
+# Create branch
+dvc exp branch best-model model/production-v2
+
+# Switch to the new branch
+git checkout model/production-v2
+
+# View the experiment's state
+dvc exp show
+```
+
+Output:
+```bash
+Git branch 'model/production-v2' has been created from experiment 'best-model'.
+Switched to branch 'model/production-v2'
+```
+
+<Note>
+The new branch contains the full experiment state including code, parameters, and DVC pipeline information.
+</Note>
+
+### List and promote workflow
+
+```bash
+# View all experiments
+dvc exp show --sort-by accuracy --sort-order desc
+
+# Promote the top performer
+dvc exp branch exp-top1 releases/model-v3.0
+
+# Push for deployment
+git push origin releases/model-v3.0
+```
+
+Output:
+```bash
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Experiment        ┃ accuracy ┃ loss        ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ ├── exp-top1      │ 0.95     │ 0.178       │
+│ ├── exp-abc123    │ 0.92     │ 0.234       │
+│ └── exp-def456    │ 0.89     │ 0.287       │
+└───────────────────┴──────────┴─────────────┘
+
+Git branch 'releases/model-v3.0' has been created from experiment 'exp-top1'.
+```
+
+## Common Workflows
+
+### Collaboration Workflow
+
+```bash
+# 1. Run experiments locally
+dvc exp run -S train.lr=0.001 -n "lr-experiment"
+
+# 2. Promote to branch for code review
+dvc exp branch lr-experiment feature/lr-tuning
+
+# 3. Push for team review
+git push -u origin feature/lr-tuning
+
+# 4. Team can now checkout and test
+# (On teammate's machine)
+git fetch
+git checkout feature/lr-tuning
+dvc pull
+```
+
+### Production Release Workflow
+
+```bash
+# 1. Find best experiment
+dvc exp show --sort-by metrics.json:accuracy --sort-order desc
+
+# 2. Create release branch
+dvc exp branch production-candidate releases/v2.0
+
+# 3. Switch to release branch
+git checkout releases/v2.0
+
+# 4. Run final validation
+python scripts/validate_model.py
+
+# 5. Tag and deploy
+git tag -a v2.0.0 -m "Production release v2.0.0 - 95% accuracy"
+git push origin releases/v2.0 --tags
+```
+
+### Multi-stage Promotion
+
+```bash
+# Development
+dvc exp run -n "dev-test"
+dvc exp branch dev-test experiment/dev-test
+git push origin experiment/dev-test
+
+# After review, promote to staging
+git checkout -b staging/new-model experiment/dev-test
+git push origin staging/new-model
+
+# After validation, merge to production
+git checkout main
+git merge staging/new-model
+git push origin main
+```
+
+### Feature Branch Workflow
+
+```bash
+# 1. Create feature branch from experiment
+dvc exp branch exp-feature feature/add-transformer
+
+# 2. Switch to the branch
+git checkout feature/add-transformer
+
+# 3. Continue development
+vim model.py
+dvc exp run
+
+# 4. Create pull request
+gh pr create --title "Add transformer model" --body "Accuracy improved to 95%"
+```
+
+## Understanding Branch Creation
+
+When you create a branch from an experiment:
+
+### What Gets Included
+
+1. **Git Commit**: A proper Git commit is created containing:
+   - Code changes from the experiment
+   - Parameter files (`params.yaml`)
+   - DVC pipeline files (`dvc.yaml`, `dvc.lock`)
+   - Metrics files
+
+2. **Commit Message**: Auto-generated message includes:
+   - Experiment name
+   - Timestamp
+   - Changed metrics and parameters
+
+3. **DVC Cache**: References to cached model outputs and data
+
+<Info>
+The branch is a full Git branch, indistinguishable from branches created manually. It can be merged, rebased, and pushed like any other branch.
+</Info>
+
+### Branch vs Apply
+
+Choose between `dvc exp branch` and `dvc exp apply`:
+
+| Operation | `dvc exp branch` | `dvc exp apply` |
+|-----------|------------------|------------------|
+| Creates | New Git branch | No new branch |
+| Workspace | Unchanged | Updated |
+| Use case | Preserve/share | Continue working |
+| Permanent | Yes | No (until commit) |
+| Remote | Can push | Cannot push |
+
+```bash
+# Use branch for collaboration
+dvc exp branch exp-abc feature/new-model
+git push origin feature/new-model
+
+# Use apply to continue working
+dvc exp apply exp-abc
+# Make more changes...
+git commit -m "Further improvements"
+```
+
+## Integration with Git
+
+### View branch history
+
+```bash
+# Create branch
+dvc exp branch exp-a1b2c model/v2
+
+# View git log
+git log model/v2 -n 1 --oneline
+```
+
+Output:
+```bash
+a1b2c3d [dvc exp] exp-a1b2c: lr=0.001, accuracy=0.95
+```
+
+### Merge to main branch
+
+```bash
+# Create and push experiment branch
+dvc exp branch best-exp feature/best-model
+git push origin feature/best-model
+
+# Create pull request and merge
+gh pr create --base main --head feature/best-model
+
+# Or merge locally
+git checkout main
+git merge feature/best-model
+git push origin main
+```
+
+### Delete branch after merge
+
+```bash
+# After merging to main
+git branch -d feature/experiment-branch
+git push origin --delete feature/experiment-branch
+```
+
+<Warning>
+Deleting the Git branch doesn't delete the experiment. The experiment remains accessible via `dvc exp show` until explicitly removed with `dvc exp remove`.
+</Warning>
+
+## Troubleshooting
+
+### Branch already exists
+
+```bash
+dvc exp branch exp-abc feature/model
+```
+
+Output:
+```bash
+ERROR: A branch named 'feature/model' already exists.
+```
+
+Solution:
+```bash
+# Use a different name
+dvc exp branch exp-abc feature/model-v2
+
+# Or delete the existing branch first
+git branch -D feature/model
+dvc exp branch exp-abc feature/model
+```
+
+### Experiment not found
+
+```bash
+dvc exp branch nonexistent feature/test
+```
+
+Output:
+```bash
+ERROR: experiment 'nonexistent' not found
+```
+
+Solution:
+```bash
+# List available experiments
+dvc exp show
+
+# Use correct experiment name
+dvc exp branch exp-a1b2c feature/test
+```
+
+## Related Commands
+
+- `dvc exp show` - View available experiments to promote
+- `dvc exp apply` - Apply experiment to workspace without creating branch
+- `dvc exp run` - Create new experiments
+- `dvc exp remove` - Remove experiments (doesn't affect created branches)
+- `git branch` - Standard Git branch operations
