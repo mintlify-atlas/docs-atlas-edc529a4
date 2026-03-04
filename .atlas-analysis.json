@@ -1,0 +1,183 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "DVC",
+  "projectDescription": "Data Version Control - Git for data scientists to manage code and data together",
+  "theme": "aspen",
+  "primaryColor": "#ed6334",
+  "lightColor": "#14a6c1",
+  "darkColor": "#8355c6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/data-versioning",
+              "concepts/pipelines",
+              "concepts/experiments",
+              "concepts/remote-storage"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guide/tracking-data",
+              "guide/building-pipelines",
+              "guide/running-experiments",
+              "guide/remote-storage",
+              "guide/collaboration"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "config/overview",
+              "config/dvc-files",
+              "config/remote-config"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Command Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "commands/overview"
+            ]
+          },
+          {
+            "group": "Data Management",
+            "pages": [
+              "commands/add",
+              "commands/checkout",
+              "commands/commit",
+              "commands/status",
+              "commands/diff",
+              "commands/push",
+              "commands/pull",
+              "commands/fetch"
+            ]
+          },
+          {
+            "group": "Pipeline Commands",
+            "pages": [
+              "commands/stage",
+              "commands/run",
+              "commands/repro",
+              "commands/dag"
+            ]
+          },
+          {
+            "group": "Experiment Commands",
+            "pages": [
+              "commands/exp-run",
+              "commands/exp-show",
+              "commands/exp-diff",
+              "commands/exp-apply",
+              "commands/exp-branch",
+              "commands/exp-remove"
+            ]
+          },
+          {
+            "group": "Metrics & Params",
+            "pages": [
+              "commands/metrics",
+              "commands/params",
+              "commands/plots"
+            ]
+          },
+          {
+            "group": "Remote Storage",
+            "pages": [
+              "commands/remote",
+              "commands/cache"
+            ]
+          },
+          {
+            "group": "Other Commands",
+            "pages": [
+              "commands/init",
+              "commands/config",
+              "commands/version",
+              "commands/destroy"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python API",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "Data Access",
+            "pages": [
+              "api/open",
+              "api/read",
+              "api/get_url"
+            ]
+          },
+          {
+            "group": "Metadata",
+            "pages": [
+              "api/params_show",
+              "api/metrics_show",
+              "api/exp_show",
+              "api/artifacts_show"
+            ]
+          },
+          {
+            "group": "Filesystem",
+            "pages": [
+              "api/dvcfilesystem"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Version data and models with Git-like interface",
+    "Build and manage ML pipelines",
+    "Track and compare experiments",
+    "Store data in cloud or remote storage",
+    "Collaborate on ML projects with Git",
+    "Python API for programmatic access"
+  ],
+  "publicApiSurface": [
+    "dvc add",
+    "dvc push",
+    "dvc pull",
+    "dvc repro",
+    "dvc exp run",
+    "dvc exp show",
+    "dvc metrics show",
+    "dvc params diff",
+    "dvc plots show",
+    "dvc remote add",
+    "dvc stage add",
+    "dvc.api.open()",
+    "dvc.api.read()",
+    "dvc.api.get_url()",
+    "dvc.api.params_show()",
+    "dvc.api.metrics_show()",
+    "dvc.api.exp_show()",
+    "dvc.api.DVCFileSystem"
+  ]
+}
